@@ -24,8 +24,18 @@ Schön, dass du helfen möchtest! *(English below.)*
 
 ## Ablauf
 
+Fehler, Ideen und Fragen bitte als **Issue** melden (Vorlagen „Fehler melden“
+und „Idee vorschlagen“). Sicherheitslücken nie als Issue, sondern vertraulich
+(siehe [SECURITY.md](SECURITY.md)).
+
+Pull Requests sind derzeit nur für eingeladene Mitwirkende möglich. Wer eine
+Änderung beitragen möchte, beschreibt sie bitte zuerst in einem Issue – die
+Betreuer melden sich dann.
+
+Für eingeladene Mitwirkende:
+
 1. Issue anlegen oder kommentieren, was du vorhast.
-2. Fork, Branch, Änderung.
+2. Branch, Änderung.
 3. Lokal testen:
    ```bash
    docker build -t crewgate:dev .
@@ -100,6 +110,12 @@ German half of the comments.
   old addresses redirect permanently (`routes/legacy.php`).
 
 ## English
+
+Please report bugs, ideas and questions as **issues** (templates "Bug report"
+and "Feature request"); security issues never as an issue, but confidentially
+(see [SECURITY.md](SECURITY.md)). Pull requests are currently only possible for
+invited collaborators – if you would like to contribute a change, please
+describe it in an issue first and the maintainers will get back to you.
 
 - Need-to-know: every department only sees what it needs — in the UI, in
   e-mails and in exports.
