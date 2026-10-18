@@ -1,0 +1,8 @@
+Sticker-Grafiken / Sticker graphics: Twemoji
+https://github.com/jdecked/twemoji  (Paket @twemoji/svg 15.0.0)
+
+Copyright 2019 Twitter, Inc and other contributors
+Graphics licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+
+Unverändert übernommen, nur die in BilDaBooky angebotenen Sticker.
+Copied unchanged; only the stickers offered in BilDaBooky.

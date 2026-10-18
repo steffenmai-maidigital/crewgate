@@ -1,0 +1,64 @@
+# Baut bei jedem Versions-Tag (Schema JJMMTTNN, z. B. 26101101) das
+# Docker-Abbild für Intel/AMD und ARM und legt es in die GitHub-Paketablage:
+#   ghcr.io/<owner>/crewgate:<version>   und   ghcr.io/<owner>/crewgate:latest
+# On every version tag (scheme YYMMDDNN, e.g. 26101101) builds the
+# Docker image for Intel/AMD and ARM and puts it into the GitHub package registry:
+#   ghcr.io/<owner>/crewgate:<version>   and   ghcr.io/<owner>/crewgate:latest
+name: Docker-Abbild
+
+on:
+  push:
+    tags: ['[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]']
+  # Von Hand starten; „publish: false“ baut nur zur Probe
+  # Start manually; "publish: false" only does a trial build
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Abbild in die Paketablage hochladen
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version aus dem Tag (sonst aus config/version.php)
+        id: v
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then v="${GITHUB_REF_NAME}"
+          else v="$(sed -nE "s/.*'number'\s*=>\s*'([^']+)'.*/\1/p" config/version.php)"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+          build-args: VERSION=${{ steps.v.outputs.version }}
+          tags: |
+            ${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}
+            ${{ steps.v.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.title=CrewGate
+            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

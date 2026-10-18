@@ -1,0 +1,29 @@
+.git
+.gitignore
+.github
+.editorconfig
+.env
+.DS_Store
+**/.DS_Store
+vendor
+node_modules
+backups
+dist
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+public/uploads/*
+docker-compose*.yml
+README.md
+README.en.md
+installation
+tools
+CONTRIBUTING.md
+SECURITY.md
+
+# docs/*.md (Handbücher) und CHANGELOG.md bleiben im Abbild:
+# die Hilfe-Seite der Anwendung zeigt sie an
+# docs/*.md (manuals) and CHANGELOG.md stay in the image:
+# the help page of the application shows them
+database/*.sqlite*

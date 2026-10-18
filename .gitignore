@@ -1,0 +1,23 @@
+/vendor
+/node_modules
+/.env
+/backups/*
+/storage/app/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+/public/uploads/*
+!**/.gitkeep
+.DS_Store
+/bootstrap/cache/*.php
+/dist
+/database/*.sqlite*
+__pycache__/
+/backups-test/*
+/database/data/*.sqlite*
+*.pem
+*.key
+# Werkzeuge und interne Doku gehören ins private Repo
+# Tools and internal docs belong in the private repo
+/tools

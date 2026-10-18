@@ -1,0 +1,103 @@
+# CrewGate — Compose-Projekt (Linux-Server, Synology Container Manager,
+# QNAP Container Station).
+# Kommt OHNE .env-Datei aus – alle wichtigen Werte stehen hier als
+# Umgebungsvariablen und können direkt in der DSM-Oberfläche gepflegt werden.
+# CrewGate — Compose project (Linux server, Synology Container Manager,
+# QNAP Container Station).
+# Works WITHOUT an .env file – all important values are set here as
+# environment variables and can be maintained directly in the DSM interface.
+services:
+  app:
+    # Jeder Bau erzeugt crewgate:latest; eine veröffentlichte Version bekommt zusätzlich
+    # die Versionsnummer (JJMMTTNN) als Tag an. ZURÜCK zu einer alten Version:
+    # bei beiden Diensten „build: .“ auskommentieren und bei „image:“ die
+    # alte Nummer eintragen, z. B. crewgate:26101701.
+    # Every build produces crewgate:latest; a published version additionally gets
+    # adds the version number (YYMMDDNN) as a tag. BACK to an old version:
+    # comment out "build: ." in both services and enter the old number
+    # under "image:", e.g. crewgate:26101701.
+    # Fertiges Abbild statt selbst bauen (sobald das Repo öffentlich ist):
+    # Ready-made image instead of building it yourself (once the repo is public):
+    # image: ghcr.io/steffenmai-maidigital/crewgate:latest
+    image: crewgate:latest
+    build: .
+    container_name: crewgate
+    ports:
+      - "7101:80"
+    environment: &app-env
+      # ----- Demo-Modus: true = Demo-Konten und Beispielvorgänge (Anmeldung anna.hr / demo)
+      # ----- Demo mode: true = demo accounts and sample cases (sign-in anna.hr / demo)
+      DEMO_MODE: "true"
+      TEST_MODE: "false"
+      # Hinter einem Reverse Proxy hier die oeffentliche URL eintragen,
+      # z. B. https://onboarding.firma.de
+      # Behind a reverse proxy, enter the public URL here,
+      # e.g. https://onboarding.firma.de
+      APP_URL: "http://localhost:7101"
+      # Reverse Proxys, deren Angaben (echte IP, HTTPS) geglaubt werden.
+      # Standard: nur interne Netze. "*" = allen vertrauen (nicht empfohlen).
+      # Reverse proxies whose details (real IP, HTTPS) are trusted.
+      # Default: internal networks only. "*" = trust all (not recommended).
+      TRUSTED_PROXIES: "127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1,fc00::/7"
+      DB_DATABASE: "/data/database.sqlite"
+      # Nächtliche Sicherung (02:30 Uhr) nach ./backups, Aufbewahrung in Tagen
+      # Nightly backup (02:30) to ./backups, retention in days
+      BACKUP_PATH: "/backups"
+      BACKUP_KEEP_DAYS: "14"
+      # Link zum Quellcode in der Fußzeile (AGPL); bei eigenen Änderungen auf euer Repo zeigen
+      # Link to the source code in the footer (AGPL); point to your own repo if you make changes
+      SOURCE_URL: ""
+      # APP_KEY wird beim ersten Start erzeugt und in /data/.app_key abgelegt.
+      # APP_KEY is generated on first start and stored in /data/.app_key.
+      # ----- Normalbetrieb: DEMO_MODE auf "false". Der erste Administrator
+      #       wird als eigenes Konto angelegt; ADMIN_PASSWORD leer = zufälliges
+      #       Startpasswort im Container-Protokoll (docker compose logs app).
+      # ----- Normal operation: set DEMO_MODE to "false". The first administrator
+      #       is created as an own (local) account; ADMIN_PASSWORD empty = random
+      #       initial password in the container log (docker compose logs app).
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: ""
+      # ----- Verzeichnis (Active Directory / LDAP) ist optional und wird in
+      #       der Oberfläche unter Einstellungen → Anmeldung eingerichtet.
+      #       Startwerte lassen sich auch hier setzen:
+      # ----- Directory (Active Directory / LDAP) is optional and is set up in
+      #       the interface under Settings → Sign-in.
+      #       Initial values can also be set here:
+      # LDAP_HOST: "dc01.firma.local"
+      # LDAP_PORT: "636"
+      # LDAP_SSL: "true"
+      # LDAP_BASE_DN: "DC=firma,DC=local"
+      # LDAP_USERNAME: "CN=svc-crewgate,OU=Service,DC=firma,DC=local"
+      # LDAP_PASSWORD: "geheim"
+      # AD_GROUP_HR: "CN=HR,OU=Gruppen,DC=firma,DC=local"
+      # AD_GROUP_ADMIN: "CN=Onboarding-Admins,OU=Gruppen,DC=firma,DC=local"
+    volumes:
+      - app-data:/data
+      - app-storage:/var/www/html/storage
+      - app-uploads:/var/www/html/public/uploads
+      - ./backups:/backups
+    restart: unless-stopped
+
+  # Führt den Laravel-Zeitplan aus (u. a. tägliches Löschen nach 6 Monaten)
+  # Runs the Laravel schedule (incl. daily deletion after 6 months)
+  scheduler:
+    image: crewgate:latest
+    build: .
+    container_name: crewgate-scheduler
+    command: php artisan schedule:work
+    environment:
+      <<: *app-env
+      SKIP_SETUP: "1"   # Einrichtung/Migration übernimmt nur der App-Container / setup/migration: app container only
+    volumes:
+      - app-data:/data
+      - app-storage:/var/www/html/storage
+      - app-uploads:/var/www/html/public/uploads
+      - ./backups:/backups
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  app-storage:
+  app-uploads:
