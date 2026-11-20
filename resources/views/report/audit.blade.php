@@ -81,7 +81,7 @@
                         <td>{{ $o->created_at->format('d.m.Y') }}</td>
                         <td>
                             @forelse($o->steps->sortBy('completed_at') as $s)
-                                {{ $s->role?->name }} ({{ $s->completed_by }}, {{ $s->completed_at?->format('d.m.Y H:i') }})@if(!$loop->last); @endif
+                                {{ $s->role?->bilingualName() }} ({{ $s->completed_by }}, {{ $s->completed_at?->format('d.m.Y H:i') }})@if(!$loop->last); @endif
                             @empty
                                 <span class="hint">noch keine Quittierungen / no acknowledgements yet</span>
                             @endforelse

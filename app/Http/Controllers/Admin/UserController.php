@@ -14,11 +14,15 @@ use Illuminate\Validation\Rule;
 /**
  * Benutzerverwaltung (Admin): eigene Konten anlegen, Rechte und Rollen
  * vergeben, Passwörter zurücksetzen, Konten sperren. Verzeichniskonten
- * werden nur angezeigt — ihre Rechte kommen aus den Gruppen.
+ * werden nur angezeigt — ihre Rechte kommen aus den Gruppen. Ein Passwort
+ * vom Admin ist ein Startpasswort: Die laufenden Sitzungen der Person enden,
+ * bei der nächsten Anmeldung muss sie es ändern (außer im Demo-Modus).
  *
  * User management (admin): create own accounts, assign rights and
  * roles, reset passwords, lock accounts. Directory accounts are only
- * shown — their rights come from the groups.
+ * shown — their rights come from the groups. A password from the admin is
+ * an initial password: the person's running sessions end, and they must
+ * change it at the next sign-in (except in demo mode).
  */
 class UserController extends Controller
 {
@@ -47,19 +51,22 @@ class UserController extends Controller
         $data = $this->validated($request);
         $password = $data['password'] ?: User::initialPassword();
 
-        $user = User::create([
+        $user = new User([
             'username'    => $data['username'],
             'name'        => $data['name'],
             'email'       => $data['email'] ?? null,
             'department'  => $data['department'] ?? null,
             'auth_source' => User::LOCAL,
-            'password'    => $password,
             'is_hr'       => $request->boolean('is_hr'),
             'is_admin'    => $request->boolean('is_admin'),
             'is_auditor'  => $request->boolean('is_auditor'),
             'can_create'  => $request->boolean('can_create') || $request->boolean('is_hr'),
             'active'      => true,
         ]);
+        // Startpasswort vom Admin: bei der ersten Anmeldung ändern (nicht im Demo-Modus)
+        // Initial password from the admin: change it at the first sign-in (not in demo mode)
+        $user->assignInitialPassword($password);
+        $user->save();
         $user->roles()->sync($data['roles'] ?? []);
 
         ActivityLog::write(ActivityLog::TYPE_USER, 'Eigenes Konto angelegt: ' . $user->username, $this->user()['username'] ?? null);
@@ -88,8 +95,14 @@ class UserController extends Controller
                 'is_auditor' => $request->boolean('is_auditor'),
                 'can_create' => $request->boolean('can_create') || $request->boolean('is_hr'),
             ]);
-            if ($data['password']) {
-                $user->password = $data['password'];
+            if ($data['password'] && $user->id === $ownId) {
+                // Eigenes Konto: wie „Passwort ändern“ auf der Kontoseite (keine Änderungspflicht)
+                // Own account: like "change password" on the account page (no duty to change)
+                $user->forceFill(['password' => $data['password'], 'must_change_password' => false]);
+            } elseif ($data['password']) {
+                // Neues Passwort vom Admin: andere Sitzungen enden, bei der nächsten Anmeldung ändern
+                // New password from the admin: other sessions end, change it at the next sign-in
+                $user->assignInitialPassword($data['password']);
                 \Illuminate\Support\Facades\RateLimiter::clear('sign-in:' . $user->username);
             }
             $user->roles()->sync($data['roles'] ?? []);
@@ -102,6 +115,10 @@ class UserController extends Controller
         }
         $user->mfa_policy = $data['mfa_policy'] ?: null;
         $user->save();
+        if ($user->id === $ownId) {
+            // eigene laufende Sitzung bleibt, andere enden / own running session stays, others end
+            $request->session()->put('ldap_user.password_fingerprint', $user->passwordFingerprint());
+        }
 
         ActivityLog::write(ActivityLog::TYPE_USER, 'Konto geändert: ' . $user->username, $this->user()['username'] ?? null);
 
@@ -111,8 +128,18 @@ class UserController extends Controller
     public function resetPassword(User $user)
     {
         abort_unless($user->isLocal(), 403, 'Verzeichniskonten haben hier kein Passwort.');
+        // Eigenes Konto: Die Sitzung endete sofort, das Startpasswort stünde nirgends mehr
+        // Own account: the session would end at once, the initial password would be shown nowhere
+        if ($user->id === (int) ($this->user()['id'] ?? 0)) {
+            return back()->withErrors(['user' => __('Ihr eigenes Passwort ändern Sie unter „Mein Konto“.')]);
+        }
+        // Neues Startpasswort: alle Sitzungen der Person enden (Fingerabdruck),
+        // bei der nächsten Anmeldung muss sie es ändern (nicht im Demo-Modus)
+        // New initial password: all sessions of the person end (fingerprint),
+        // they must change it at the next sign-in (not in demo mode)
         $password = User::initialPassword();
-        $user->forceFill(['password' => $password])->save();
+        $user->assignInitialPassword($password);
+        $user->save();
         \Illuminate\Support\Facades\RateLimiter::clear('sign-in:' . $user->username);
 
         ActivityLog::write(ActivityLog::TYPE_USER, 'Passwort zurückgesetzt: ' . $user->username, $this->user()['username'] ?? null);

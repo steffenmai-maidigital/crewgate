@@ -25,9 +25,13 @@ services:
     ports:
       - "7101:80"
     environment: &app-env
-      # ----- Demo-Modus: true = Demo-Konten und Beispielvorgänge (Anmeldung anna.hr / demo)
-      # ----- Demo mode: true = demo accounts and sample cases (sign-in anna.hr / demo)
-      DEMO_MODE: "true"
+      # ----- Demo-Modus: "true" = Demo-Konten und Beispielvorgänge (Anmeldung anna.hr / demo),
+      #       nur zum Ausprobieren. Stellt man danach auf "false" um, bekommen die
+      #       Demo-Konten neue Startpasswörter (Container-Protokoll).
+      # ----- Demo mode: "true" = demo accounts and sample cases (sign-in anna.hr / demo),
+      #       for trying it out only. Switching back to "false" gives the demo
+      #       accounts new initial passwords (container log).
+      DEMO_MODE: "false"
       TEST_MODE: "false"
       # Hinter einem Reverse Proxy hier die oeffentliche URL eintragen,
       # z. B. https://onboarding.firma.de
@@ -49,10 +53,10 @@ services:
       SOURCE_URL: ""
       # APP_KEY wird beim ersten Start erzeugt und in /data/.app_key abgelegt.
       # APP_KEY is generated on first start and stored in /data/.app_key.
-      # ----- Normalbetrieb: DEMO_MODE auf "false". Der erste Administrator
+      # ----- Normalbetrieb (DEMO_MODE "false"): Der erste Administrator
       #       wird als eigenes Konto angelegt; ADMIN_PASSWORD leer = zufälliges
       #       Startpasswort im Container-Protokoll (docker compose logs app).
-      # ----- Normal operation: set DEMO_MODE to "false". The first administrator
+      # ----- Normal operation (DEMO_MODE "false"): the first administrator
       #       is created as an own (local) account; ADMIN_PASSWORD empty = random
       #       initial password in the container log (docker compose logs app).
       ADMIN_USERNAME: "admin"

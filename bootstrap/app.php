@@ -39,8 +39,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
-            // Merkt den Anlass einer Aktion fürs passende Lob von Rua / remembers the occasion of an action for Rua's fitting praise
-            \App\Http\Middleware\FoxOccasion::class,
         ]);
 
         // Sprache vor dem Laden der Modelle aus der URL setzen — sonst erscheint
@@ -66,4 +64,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Fehlernummer in jeden Protokolleintrag; dieselbe zeigt die Fehlerseite (Standard 03)
         // Error reference in every log entry; the error page shows the same one (Standard 03)
         $exceptions->context(fn () => ['reference' => \App\Support\ErrorPage::reference()]);
+        // API: Fehler immer als JSON (422 mit Fehlern je Feld), auch ohne „Accept: application/json“
+        // API: errors always as JSON (422 with errors per field), even without "Accept: application/json"
+        $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*') || $request->expectsJson());
     })->create();

@@ -22,6 +22,12 @@ class CustomField extends Model
     public const CHECKBOX_YES = 'yes';
     public const CHECKBOX_NO = 'no';
 
+    /** Höchstlänge eines Freitexts (Schutz der Prüfung per regulärem Ausdruck) / Maximum length of a free text */
+    public const TEXT_MAX = 2000;
+
+    /** Grenze für Rückschritte der Format-Prüfung (PHP-Standard: 1 000 000) / Backtrack limit of the format check */
+    public const REGEX_BACKTRACK_LIMIT = 100000;
+
     public const TYPES = [
         self::TYPE_SELECT      => 'Auswahlfeld',
         self::TYPE_MULTISELECT => 'Mehrfachauswahl',
@@ -119,10 +125,45 @@ class CustomField extends Model
             ],
             default => [ // Freitext / free text
                 $key => array_merge(
-                    [$base],
-                    $this->regex ? ['regex:~' . str_replace('~', '\~', $this->regex) . '~u'] : [],
+                    ['bail', $base, 'max:' . self::TEXT_MAX],
+                    $this->regex ? [$this->regexGuard(), 'regex:' . $this->pattern()] : [],
                 ),
             ],
+        };
+    }
+
+    /** Regulärer Ausdruck des Feldes mit Begrenzern / Regular expression of the field with delimiters */
+    public function pattern(): string
+    {
+        return '~' . str_replace('~', '\~', (string) $this->regex) . '~u';
+    }
+
+    /**
+     * Schutz gegen ReDoS: Der reguläre Ausdruck läuft zuerst mit kleiner
+     * Rückschritt-Grenze. Bricht PCRE ab (zu aufwendig, z. B. „(a+)+$“ bei
+     * langer Eingabe), gilt der Wert als ungültig, statt den Server lange zu
+     * beschäftigen. Zusammen mit TEXT_MAX bleibt jede Prüfung kurz.
+     *
+     * Protection against ReDoS: the regular expression runs first with a small
+     * backtrack limit. If PCRE gives up (too costly, e.g. "(a+)+$" on long
+     * input), the value counts as invalid instead of keeping the server busy.
+     * Together with TEXT_MAX every check stays short.
+     */
+    private function regexGuard(): \Closure
+    {
+        $pattern = $this->pattern();
+
+        return function (string $attribute, mixed $value, \Closure $fail) use ($pattern) {
+            if (! is_string($value) && ! is_numeric($value)) {
+                return;   // übernimmt die regex-Regel / the regex rule takes over
+            }
+            $limit = ini_get('pcre.backtrack_limit');
+            ini_set('pcre.backtrack_limit', (string) self::REGEX_BACKTRACK_LIMIT);
+            $result = @preg_match($pattern, (string) $value);
+            ini_set('pcre.backtrack_limit', (string) $limit);
+            if ($result === false) {
+                $fail(__(':attribute lässt sich mit dem hinterlegten Format nicht prüfen. Bitte den Wert kürzen oder das Format des Feldes vereinfachen lassen.'));
+            }
         };
     }
 

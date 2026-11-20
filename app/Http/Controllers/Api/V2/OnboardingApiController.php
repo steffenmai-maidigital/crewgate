@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api\V2;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\CustomField;
 use App\Models\Onboarding;
 use App\Models\Process;
 use App\Models\Role;
 use App\Services\LdapService;
 use App\Services\MailService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * API v2: Vorgänge anlegen, Status abrufen, gepflegte Werte abrufen.
@@ -22,27 +25,62 @@ class OnboardingApiController extends Controller
 {
     /**
      * POST /api/v2/cases – Vorgang anlegen (Status: in Vorbereitung);
-     * alte Adresse /api/v2/vorgaenge und alte Prozess-Schlüssel gelten weiter
+     * alte Adresse /api/v2/vorgaenge und alte Prozess-Schlüssel gelten weiter.
+     * Geprüft wird wie im Formular: nur aktive Prozesse, Anlage-Felder mit
+     * Pflicht, Format (regulärer Ausdruck) und Auswahl-Optionen; sonst 422 mit
+     * Fehlern je Feld (fields.<id>).
      *
      * POST /api/v2/cases – create a case (status: in preparation);
-     * the old address /api/v2/vorgaenge and old process keys keep working
+     * the old address /api/v2/vorgaenge and old process keys keep working.
+     * Validated like the form: active processes only, intake fields with
+     * required flag, format (regular expression) and select options; otherwise
+     * 422 with errors per field (fields.<id>).
      */
     public function store(Request $request, LdapService $ldap)
     {
         if ($request->filled('process')) {
             $request->merge(['process' => Process::currentKey((string) $request->input('process'))]);
         }
-        $data = $request->validate([
-            'process' => ['required', 'exists:processes,key'],
+        $request->validate([
+            'process' => ['required', 'string', Rule::exists('processes', 'key')->where('active', true)],
+            'fields' => ['nullable', 'array'], // Anlage-Felder: {field_id: value} / intake fields: {field_id: value}
+        ]);
+        $process = (string) $request->input('process');
+
+        // Anlage-Felder des Prozesses; Werte per Feld-ID oder (wie bisher) per deutscher Bezeichnung
+        // Intake fields of the process; values by field id or (as before) by German label
+        $intakeFields = Role::intake()?->fields()->where('active', true)
+            ->where('fill_stage', CustomField::STAGE_INTAKE)->forProcess($process)->get() ?? collect();
+        $given = (array) $request->input('fields', []);
+        $values = [];
+        foreach ($intakeFields as $field) {
+            $raw = $given[$field->id] ?? $given[$field->label] ?? null;
+            if ($raw !== null) {
+                $values[$field->id] = $raw;
+            }
+        }
+
+        $rules = [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'start_date' => ['nullable', 'date'],
             'supervisor_username' => ['required', 'string', 'max:100'],
             'supervisor_due_date' => ['nullable', 'date'],
-            'roles_due_date' => ['nullable', 'date', 'after_or_equal:supervisor_due_date'],
+            'roles_due_date' => array_merge(['nullable', 'date'], $request->filled('supervisor_due_date') ? ['after_or_equal:supervisor_due_date'] : []),
             'notes' => ['nullable', 'string', 'max:2000'],
-            'fields' => ['nullable', 'array'], // Anlage-Felder: {field_id: value} / intake fields: {field_id: value}
-        ]);
+        ];
+        $messages = [];
+        $attributes = [];
+        foreach ($intakeFields as $field) {
+            $rules = array_merge($rules, $field->rulesFor('fields.' . $field->id));
+            $attributes['fields.' . $field->id] = $field->label;
+            $attributes['fields.' . $field->id . '.*'] = $field->label;
+            if ($field->regex_hint) {
+                $messages['fields.' . $field->id . '.regex'] = $field->label . ': ' . $field->regex_hint;
+            }
+        }
+        $data = Validator::make($request->except('fields') + ['fields' => $values], $rules, $messages, $attributes)->validate();
+        $data['process'] = $process;
 
         $supervisor = null;
         try {
@@ -53,7 +91,7 @@ class OnboardingApiController extends Controller
         }
 
         $onboarding = Onboarding::create([
-            ...collect($data)->except('fields')->all(),
+            ...collect($data)->only(['process', 'first_name', 'last_name', 'start_date', 'supervisor_username', 'supervisor_due_date', 'roles_due_date', 'notes'])->all(),
             'supervisor_name'  => $supervisor['name'] ?? null,
             'supervisor_email' => $supervisor['mail'] ?? null,
             'department'       => $supervisor['department'] ?? null,
@@ -61,13 +99,10 @@ class OnboardingApiController extends Controller
             'status'           => 'draft',
         ]);
 
-        // Optionale Anlage-Feldwerte (nur gültige Felder des Prozesses)
-        // Optional intake field values (only valid fields of the process)
-        $intakeFields = Role::intake()?->fields()->where('active', true)
-            ->where('fill_stage', \App\Models\CustomField::STAGE_INTAKE)->forProcess($data['process'])->get() ?? collect();
-
+        // Geprüfte Anlage-Feldwerte speichern (leere Werte entfallen)
+        // Store the validated intake field values (empty values are skipped)
         foreach ($intakeFields as $field) {
-            $raw = $data['fields'][$field->id] ?? $data['fields'][$field->label] ?? null;
+            $raw = $data['fields'][$field->id] ?? null;
             if ($raw === null || $raw === '' || $raw === []) {
                 continue;
             }
@@ -117,6 +152,7 @@ class OnboardingApiController extends Controller
             ->map(fn ($v) => [
                 'field_id' => $v->custom_field_id,
                 'role' => $v->field->role?->name,
+                'role_en' => $v->field->role?->name_en,
                 'label' => $v->field->label,
                 'label_en' => $v->field->label_en,
                 'value' => $v->value,
@@ -148,7 +184,7 @@ class OnboardingApiController extends Controller
             'roles_due_date' => $o->roles_due_date?->toDateString(),
             'created_at' => $o->created_at->toIso8601String(),
             'completed_at' => $o->completed_at?->toIso8601String(),
-            'acknowledged_roles' => $o->steps->map(fn ($s) => ['role' => $s->role?->name, 'by' => $s->completed_by, 'at' => $s->completed_at?->toIso8601String()])->all(),
+            'acknowledged_roles' => $o->steps->map(fn ($s) => ['role' => $s->role?->name, 'role_en' => $s->role?->name_en, 'by' => $s->completed_by, 'at' => $s->completed_at?->toIso8601String()])->all(),
             'pending_roles' => $o->status === 'open' ? $o->pendingRoles()->pluck('name')->all() : [],
         ];
     }

@@ -85,7 +85,7 @@ class DashboardController extends Controller
         // Kennzahlen: sichtbarer Bestand des Benutzers
         // Key figures: the user's visible cases
         $scope = Onboarding::query();
-        if (! (($user['is_hr'] ?? false) || ($user['is_admin'] ?? false) || $roleIds !== [])) {
+        if (! (($user['is_hr'] ?? false) || ($user['is_admin'] ?? false) || ($user['is_auditor'] ?? false) || $roleIds !== [])) {
             if (! empty($user['department'])) {
                 $scope->where('department', $user['department']);
             } else {

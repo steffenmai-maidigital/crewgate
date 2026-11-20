@@ -171,16 +171,34 @@ class Directory
     }
 
     /**
-     * Einstellungen aus einem Formular speichern (leeres Passwort = altes behalten)
+     * Einstellungen aus einem Formular speichern (leeres Passwort = altes behalten).
+     * Ausnahme: Ändern sich Server, Port, Verschlüsselung oder Servicekonto und
+     * kommt kein neues Passwort, wird ein leeres gespeichert. Sonst ginge das
+     * alte Passwort (auch das aus der Umgebung) beim nächsten Verbindungstest an
+     * den neuen, womöglich fremden Server.
      *
-     * Save settings from a form (empty password = keep the old one)
+     * Save settings from a form (empty password = keep the old one).
+     * Exception: if server, port, encryption or service account change and no
+     * new password comes, an empty one is stored. Otherwise the old password
+     * (including the one from the environment) would go to the new, possibly
+     * foreign server at the next connection test.
      */
     public static function save(array $data): void
     {
+        $old = self::settings();
+        $differs = fn (string $key, string $field, callable $cast) => array_key_exists($key, $data)
+            && trim((string) $data[$key]) !== '' && $cast($data[$key]) !== $old[$field];
+        $moved = $differs('ldap_host', 'host', fn ($v) => trim((string) $v))
+            || $differs('ldap_port', 'port', fn ($v) => (int) $v)
+            || $differs('ldap_encryption', 'encryption', fn ($v) => (string) $v)
+            || $differs('ldap_bind_dn', 'bind_dn', fn ($v) => trim((string) $v));
+
         foreach (self::KEYS as $key) {
             if ($key === 'ldap_bind_password') {
                 if (($data[$key] ?? '') !== '') {
                     Setting::set($key, Crypt::encryptString((string) $data[$key]));
+                } elseif ($moved) {
+                    Setting::set($key, Crypt::encryptString(''));
                 }
                 continue;
             }
@@ -192,6 +210,54 @@ class Directory
                 Setting::set($key, trim((string) ($data[$key] ?? '')));
             }
         }
+    }
+
+    /**
+     * Gruppenangaben beim Speichern eindeutig machen (eine je Zeile): Ein Name
+     * (kein DN) wird über das Verzeichnis zum DN aufgelöst. Gibt es den Namen
+     * mehrfach, kommt ein Fehler – sonst zählte jede gleichnamige Gruppe in einer
+     * anderen OU als Admin-, Rollen- oder Pflichtgruppe. Ist das Verzeichnis aus,
+     * nicht erreichbar oder kennt den Namen nicht, bleibt die Eingabe, wie sie ist.
+     * Nach Directory::save() aufrufen, damit die neuen Verbindungsdaten gelten.
+     * Liefert ['value' => aufgelöste Zeilen, 'error' => null oder Meldung].
+     *
+     * Make group entries unambiguous when saving (one per line): a name (not a
+     * DN) is resolved to its DN via the directory. If the name exists more than
+     * once, an error comes back – otherwise every group of that name in another
+     * OU would count as admin, role or mandatory group. If the directory is off,
+     * unreachable or does not know the name, the entry stays as it is.
+     * Call after Directory::save() so that the new connection settings apply.
+     * Returns ['value' => resolved lines, 'error' => null or message].
+     */
+    public static function resolveGroups(?string $value): array
+    {
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) $value)), fn ($l) => $l !== ''));
+        $directory = null;
+        try {
+            $directory = self::fromSettings();
+        } catch (\Throwable) {
+            // Einstellungen unvollständig: nichts auflösen / settings incomplete: resolve nothing
+        }
+        $out = [];
+        foreach ($lines as $line) {
+            if (! $directory || str_contains($line, '=')) {   // aus oder schon ein DN / off or already a DN
+                $out[] = $line;
+                continue;
+            }
+            try {
+                $hits = array_values(array_filter($directory->groups($line),
+                    fn ($g) => mb_strtolower((string) $g['name']) === mb_strtolower($line)));
+            } catch (\Throwable) {
+                $out[] = $line;   // nicht erreichbar: Eingabe behalten / unreachable: keep the entry
+                continue;
+            }
+            if (count($hits) > 1) {
+                return ['value' => (string) $value, 'error' => __('Die Gruppe „:name“ gibt es mehrfach im Verzeichnis. Bitte den vollständigen DN eintragen.', ['name' => $line])];
+            }
+            $out[] = count($hits) === 1 ? (string) $hits[0]['dn'] : $line;
+        }
+
+        return ['value' => implode("\n", $out), 'error' => null];
     }
 
     /** Validierungsregeln für das Einstellungsformular / Validation rules for the settings form */
@@ -223,7 +289,7 @@ class Directory
      * last_name, mail, department, manager_dn, groups) or null for wrong
      * credentials. Connection errors throw a RuntimeException.
      */
-    public function authenticate(string $username, string $password): ?array
+    public function authenticate(string $username, #[\SensitiveParameter] string $password): ?array
     {
         if (! $this->tlsMatches()) {
             return $this->runIsolated('authenticate', [$username, $password]);
@@ -523,6 +589,11 @@ class Directory
         ldap_set_option($c, LDAP_OPT_REFERRALS, 0);
         ldap_set_option($c, LDAP_OPT_NETWORK_TIMEOUT, $this->k['timeout']);
         ldap_set_option($c, LDAP_OPT_TIMELIMIT, $this->k['timeout']);
+        // Zeitlimit je Operation: Ein Server, der annimmt und nicht antwortet, blockiert sonst den Webserver
+        // Timeout per operation: otherwise a server that accepts but never answers blocks the web server
+        if (defined('LDAP_OPT_TIMEOUT')) {
+            ldap_set_option($c, LDAP_OPT_TIMEOUT, $this->k['timeout']);
+        }
         if ($this->k['encryption'] === 'starttls' && ! @ldap_start_tls($c)) {
             throw new RuntimeException(__('Verzeichnis: STARTTLS fehlgeschlagen (:fehler).', ['fehler' => $this->errorText($c)]));
         }
@@ -558,7 +629,7 @@ class Directory
      * change password, 775 locked) only goes to the log, never to the person
      * asking. Other errors → RuntimeException.
      */
-    private function userBind(string $dn, string $password): bool
+    private function userBind(string $dn, #[\SensitiveParameter] string $password): bool
     {
         $c = $this->connect();
         if (@ldap_bind($c, $dn, $password)) {
@@ -632,7 +703,7 @@ class Directory
      * Run a method in a fresh PHP process (artisan directory:isolated);
      * input and output as JSON, errors come back as RuntimeException.
      */
-    private function runIsolated(string $method, array $arguments)
+    private function runIsolated(string $method, #[\SensitiveParameter] array $arguments)
     {
         $php = is_executable(PHP_BINDIR . '/php') ? PHP_BINDIR . '/php' : 'php';
         $p = proc_open([$php, base_path('artisan'), 'directory:isolated'], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, base_path());
@@ -662,7 +733,7 @@ class Directory
      *
      * Counterpart in the fresh process (called by the directory:isolated command)
      */
-    public static function handleIsolated(string $json): string
+    public static function handleIsolated(#[\SensitiveParameter] string $json): string
     {
         try {
             $d = json_decode($json, true, 16, JSON_THROW_ON_ERROR);

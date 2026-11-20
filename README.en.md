@@ -38,25 +38,24 @@ makes it a traceable workflow:
 |---|---|
 | Process types | onboarding, position change, offboarding and master data change built in; own types (e.g. "apprentice takeover") with a shortened workflow — departments not involved are neither notified nor asked to acknowledge |
 | Workflow | roles with a sort order; preparation by the line manager with save-as-draft, then notification of the departments; acknowledge right from the task list; HR close; workflow graphic on dashboard and case page |
-| Line managers | HR enters the manager, the department is read from AD (`department`); managers see all cases of their department and may fill in the steps of all departments |
+| Line managers | HR enters the manager, the department is read from AD (`department`) or the manager's CrewGate account; managers see their cases in full and fill in the steps of all departments during preparation. Colleagues of the same department only see the header data |
 | Fields | per role and process: select, multi-select, checkbox, date, product selection and free text with regex; HR intake fields; "visible to all departments" |
 | Product catalogue | products with image, price, article and manufacturer number; categories with colour and order; maintained by the responsible role itself |
-| Visibility | per role "sees data of"; HR, admins, auditors and managers see the whole case |
+| Visibility | per role "sees data of"; HR, admins, auditors and managers see the whole case; accounts without a relation to the case get no access |
 | E-mails | text e-mail to the central address of the next role with the data visible to it; never direct links, only a generic portal link; templates (DE/EN) editable; mail log with full text and status |
 | Deadlines | due dates for managers and departments, automatic reminders |
 | Bulk import | CSV import for many cases at once (e.g. an apprentice intake) |
-| API v2 | create cases, read status and values — for HR and ITSM systems ([docs/API.md](docs/API.md)) |
+| API v2 | create cases (validated like the form), read status and values — for HR and ITSM systems ([docs/API.md](docs/API.md)) |
 | Audit log | who filled in, acknowledged, sent or changed what and when; hash chain; CSV and PDF export; "auditor" role with read-only access |
 | Deletion | switchable, 1–120 months after closing, daily at 02:00; every deletion is logged |
-| Languages | German and English, switcher with flags; English labels for fields, products and categories; e-mails and exports bilingual |
+| Languages | German and English, switcher with flags; English labels for fields, products, categories, processes and roles; e-mails and exports bilingual |
 | Branding | company name, logo, header, accent and footer colour, footer text; glass design, light and dark |
 | Imprint and privacy | can be switched on individually, as your own text or a link to the company website; reachable without login, with a template for the privacy notice |
 | Help | version, licence, manuals and change history right in the app (footer → **Help**) |
-| Sign-in | own accounts (menu **Users**) always; directory optional (Active Directory, Samba AD, OpenLDAP, Univention) with “Test connection”; groups as DN or name, nested AD groups; emergency access via `php artisan crewgate:admin-password` |
+| Sign-in | own accounts (menu **Users**) always; directory optional (Active Directory, Samba AD, OpenLDAP, Univention) with “Test connection”; groups as DN or name (a name is resolved unambiguously to its DN when saving), nested AD groups; initial passwords must be changed; emergency access via `php artisan crewgate:admin-password` (also `--disable-2fa`) |
 | Two-factor | TOTP with authenticator app; per group mandatory, optional or off, directory groups with mandatory, exception per user; recovery codes; reset by administrators |
-| Fox helper | Rua the fox (a Viking fox from a Norwegian fjord, named in Ireland), talks informally; greets, gives tips matching role and page, promotes free software on the sign-in page; can be switched off centrally and per person |
-| Operations | Docker, SQLite, nightly backup with checksum, safe updates with downgrade protection, test system marker (`TEST_MODE`), demo mode without a directory |
-| Security | security headers (CSP, HSTS), password-guessing brake, proxy headers only trusted from internal networks |
+| Operations | Docker, SQLite, nightly backup with checksum and key, safe updates with downgrade protection, test system marker (`TEST_MODE`), demo mode without a directory |
+| Security | security headers (CSP, HSTS), password-guessing brake, proxy headers only trusted from internal networks; locking ends running sessions at once, a new password the other ones; uploads delivered as images only; CSV export with formula protection |
 
 ## Roles
 
@@ -92,9 +91,10 @@ mkdir -p backups
 docker compose up -d --build
 ```
 
-CrewGate is then available at <http://localhost:7101>. Out of the box it runs
-in **demo mode** (`DEMO_MODE: "true"`): eight demo accounts with sample
-cases, no directory needed, e-mails go to the log instead of a mail server.
+CrewGate is then available at <http://localhost:7101>, in normal operation
+(see below). To try it out there is **demo mode**: set `DEMO_MODE: "true"` in
+`docker-compose.yml`. You then get eight demo accounts with sample cases, no
+directory is needed, e-mails go to the log instead of a mail server.
 
 | Account | Password | Role |
 |---|---|---|
@@ -102,6 +102,7 @@ cases, no directory needed, e-mails go to the log instead of a mail server.
 | `max.admin` | `demo` | admin |
 | `petra.chef` | `demo` | line manager (sales) |
 | `karl.chef` | `demo` | line manager (production) |
+| `rita.audit` | `demo` | auditor (reads cases and the log) |
 | `tim.it` | `demo` | IT department |
 | `eva.einkauf` | `demo` | purchasing department |
 | `frank.facility` | `demo` | facility department |
@@ -111,12 +112,19 @@ Rebuild the demo data: `docker exec crewgate php artisan demo:seed --fresh`
 
 ### Production
 
-1. In `docker-compose.yml` set `DEMO_MODE: "false"`. No `.env` file is
+1. `DEMO_MODE` stays `"false"` (the default). No `.env` file is
    needed. On the first start CrewGate creates the administrator `admin` as
    an own account; the initial password is printed in the container log
    (`docker compose logs app`) or set beforehand as `ADMIN_PASSWORD`.
-2. Sign in as `admin` → **Users**: set your own password, create further
-   accounts (HR, departments, supervisors) — or enter the directory (Active
+   If demo mode ran on the same volumes before, the demo accounts get new
+   initial passwords on the first start in normal operation (also in the
+   container log, e.g. for `max.admin`); demo accounts without the admin
+   right are locked. Starting with an empty database is cleaner
+   ([installation/en/docker.md](installation/en/docker.md), `FRESH_DB`).
+2. Sign in as `admin`: an initial password from the log must first be
+   replaced by your own under **My account**. Then create further accounts
+   under **Users** (HR, departments, supervisors; they also change their
+   initial password at the first sign-in) — or enter the directory (Active
    Directory, Samba AD, OpenLDAP, Univention) under **Settings → 3 ·
    Sign-in**, save and “Test connection”. Afterwards every employee signs in
    with their company account; permissions come from the groups under
@@ -129,7 +137,8 @@ Rebuild the demo data: `docker exec crewgate php artisan demo:seed --fresh`
 6. Create the first case as HR.
 
 Nobody gets locked out: `docker exec crewgate php artisan crewgate:admin-password`
-creates an own admin account or resets its password at any time.
+creates an own admin account or resets its password at any time (an initial
+password); `--disable-2fa` also resets that account's two-factor sign-in.
 
 CrewGate generates the `APP_KEY` itself on the first start and stores it in
 `/data/.app_key`. Step by step: [installation/en/docker.md](installation/en/docker.md).
@@ -163,9 +172,11 @@ after the first start; the values there take precedence.
 
 ### Data and backups
 
-- `./backups` (folder, create it before the first start): every night at
-  02:30 a ZIP with the database and uploads plus a SHA-256 checksum; manual
-  backups ("Back up now" under **Settings**) in `./backups/manual`
+- `./backups` (folder, create it before the first start, administrators
+  only): every night at 02:30 a ZIP with the database, the key `.app_key` and
+  uploads plus a SHA-256 checksum; manual backups ("Back up now" under
+  **Settings**) in `./backups/manual`. With the key, the service account
+  password and two-factor secrets can be read after a move.
 - `app-data` (volume): database `database.sqlite`, key `.app_key` and the
   backups taken before every update under `/data/backups/` (the 10 newest are kept)
 - `app-storage` (volume): sessions, logs, cache
@@ -246,7 +257,7 @@ app/Models            Onboarding (case), OnboardingStep, OnboardingValue, Role,
                       CustomField, Process, Product, ProductCategory, ActivityLog, MailLog, Setting
 app/Services          WorkflowService (state machine), LdapService (user search, groups),
                       DemoDirectory, MailService, ReportService (PDF), UpgradeService, LicenseService
-app/Support           Directory (LDAP integration, shared building block), Fox, ProductInfo, LegalPages, ErrorPage, Mfa
+app/Support           Directory (LDAP integration, shared building block), ProductInfo, LegalPages, ErrorPage, Mfa
 app/Http/Controllers  cases, roles, fields, products, settings, audit log, API v2
 app/Console/Commands  purge, ad:sync-groups, reminders:send, audit:report, demo:seed, app:upgrade
 resources/views       Blade UI, a single stylesheet in public/css/app.css

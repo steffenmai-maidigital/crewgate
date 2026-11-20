@@ -14,11 +14,16 @@ Gilt für Docker allgemein und für Synology/QNAP. Per SSH auf dem NAS jeweils
 | Volume `crewgate_app-data` (`/data`) | Datenbank `database.sqlite`, Schlüssel `.app_key`, Sicherungen vor jedem Update unter `backups/` |
 | Volume `crewgate_app-storage` | Sitzungen, Zwischenspeicher, Protokolle |
 | Volume `crewgate_app-uploads` | Firmenlogo und Produktbilder |
-| Ordner `./backups` | nächtliche Sicherungen; `manual/` für Sicherungen, die von Hand angelegt wurden |
+| Ordner `./backups` | nächtliche Sicherungen; `manual/` für Sicherungen, die von Hand angelegt wurden; jede enthält auch `.app_key` |
 | `docker-compose.yml` | alle Einstellungen, auch Zugangsdaten für AD und SMTP |
 
 Die Compose-Datei enthält Zugangsdaten. Sie gehört in die Sicherung, aber
-nicht in einen Ordner, den viele lesen können. Datenbank und Sicherungen enthalten Personaldaten – den Ordner `backups` nur Administratoren zugänglich machen.
+nicht in einen Ordner, den viele lesen können. Datenbank und Sicherungen enthalten Personaldaten – den Ordner `backups` nur Administratoren zugänglich machen. CrewGate legt die ZIP-Dateien ohne Leserecht für andere an (`0640`); zum Prüfen oder Kopieren auf dem Host `sudo` verwenden.
+
+**`.app_key` ist wichtig:** Mit diesem Schlüssel sind das Passwort des
+Servicekontos und die Zwei-Faktor-Geheimnisse verschlüsselt. Jede Sicherung
+enthält ihn, damit eine Wiederherstellung auf neuer Hardware vollständig ist.
+Wer eine Sicherung lesen kann, kann damit auch diese Angaben entschlüsseln.
 
 ## Update
 
@@ -87,14 +92,22 @@ entfernt sie).
 ## Sicherung
 
 - **Automatisch:** jede Nacht um 2:30 Uhr legt der Container
-  `crewgate-scheduler` ein ZIP mit Datenbank und Uploads samt SHA-256-Prüfsumme
-  in `./backups` ab. Aufbewahrt werden sie `BACKUP_KEEP_DAYS` Tage (Standard 14, mindestens 4).
+  `crewgate-scheduler` ein ZIP mit Datenbank, Schlüssel `.app_key` und Uploads
+  samt SHA-256-Prüfsumme in `./backups` ab. Aufbewahrt werden sie
+  `BACKUP_KEEP_DAYS` Tage (Standard 14, mindestens 4).
 - **Sofort, im Browser:** als Administrator unter **Einstellungen → Sicherung → Jetzt sichern**.
   Diese Sicherungen liegen in `./backups/manual` und werden nie automatisch
   gelöscht.
 - **Zusätzlich auslagern:** den Ordner `backups` und die `docker-compose.yml`
   regelmäßig auf ein zweites Gerät kopieren, auf der Synology z. B. mit
-  **Hyper Backup**.
+  **Hyper Backup**; das Ziel verschlüsseln oder nur Administratoren freigeben.
+- Einen Download der Sicherungen im Browser gibt es nicht; sie bleiben auf dem
+  Server.
+
+Eine Sicherung enthält: `database/database.sqlite` (konsistente Kopie, auch
+während des Betriebs), `.app_key` und den Ordner `uploads/` (Logo,
+Produktbilder). Steht `APP_KEY` fest in der `docker-compose.yml`, gibt es keine
+Datei `.app_key`; dann gehört die Compose-Datei mit in die Sicherung.
 
 Eine Sicherung prüfen:
 
@@ -116,13 +129,19 @@ docker run --rm -v crewgate_app-data:/data -v crewgate_app-uploads:/uploads \
   set -e; mkdir /tmp/r && cd /tmp/r && unzip -q /backups/DATEI.zip
   rm -f /data/database.sqlite /data/database.sqlite-wal /data/database.sqlite-shm
   cp database/database.sqlite /data/database.sqlite
+  if [ -f .app_key ]; then cp .app_key /data/.app_key && chmod 600 /data/.app_key; fi
   if [ -d uploads ]; then cp -r uploads/. /uploads/; fi
   echo wiederhergestellt"
 
 docker compose start
 ```
 
-Die Dateirechte setzt CrewGate beim Start selbst.
+Die Dateirechte setzt CrewGate beim Start selbst. Mit dem Schlüssel aus der
+Sicherung sind Servicekonto-Passwort und Zwei-Faktor-Anmeldungen sofort wieder
+gültig; alle Benutzer melden sich einmal neu an. Ältere Sicherungen ohne
+`.app_key` stellen die Daten ebenfalls her; dann das Servicekonto-Passwort unter
+**Einstellungen → Anmeldung** neu eintragen, und wer Zwei-Faktor nutzt, braucht
+„Zwei-Faktor zurücksetzen“ unter **Benutzer**.
 
 **Umzug auf einen anderen Server:** Dort CrewGate wie in der
 Installationsanleitung einrichten (gleiche `docker-compose.yml`), einmal
@@ -152,8 +171,26 @@ Mailversand umstellen.
 
 ### Kein Administrator kommt hinein
 
-Die Administratoren-Gruppe steht unter **Einstellungen**, ersatzweise in
-`AD_GROUP_ADMIN`. Prüfen, ob das Konto **direktes** Mitglied dieser Gruppe ist
+Ein eigenes Admin-Konto anlegen bzw. sein Passwort neu setzen (Notzugang):
+
+```bash
+docker exec crewgate php artisan crewgate:admin-password admin
+```
+
+Der Befehl gibt ein Startpasswort aus; bei der Anmeldung muss ein eigenes
+vergeben werden, laufende Sitzungen dieses Kontos enden. Fehlt das Konto, legt
+der Befehl es an. Ist das Handy mit der Authenticator-App weg, setzt
+`--disable-2fa` zusätzlich die Zwei-Faktor-Anmeldung dieses Kontos zurück:
+
+```bash
+docker exec crewgate php artisan crewgate:admin-password admin --disable-2fa
+```
+
+Ist die Zwei-Faktor-Anmeldung für Administratoren Pflicht, wird sie nach der
+Anmeldung neu eingerichtet. Jeder Aufruf steht im Protokoll.
+
+Bei Verzeichniskonten: Die Administratoren-Gruppe steht unter
+**Einstellungen**, ersatzweise in `AD_GROUP_ADMIN`. Prüfen, ob das Konto **direktes** Mitglied dieser Gruppe ist
 (eingetragen wird der vollständige DN, z. B. `CN=CrewGate-Admins,OU=Gruppen,DC=firma,DC=local`). Die LDAP-Meldungen zeigt `LDAP_LOGGING: "true"` im
 Protokoll (`docker compose logs -f app`).
 
@@ -198,6 +235,7 @@ Jeweils mit `docker exec crewgate` davor:
 | Befehl | Zweck |
 |---|---|
 | `php artisan app:upgrade` | Versionsabgleich und Migrationen von Hand ausführen |
+| `php artisan crewgate:admin-password [name] [--disable-2fa]` | Notzugang: eigenes Admin-Konto mit Startpasswort, optional ohne Zwei-Faktor |
 | `php artisan schedule:list` | geplante Aufgaben und nächste Ausführung anzeigen |
 | `php artisan cache:clear` | Zwischenspeicher leeren (hebt auch Anmeldesperren auf) |
 | `php artisan ad:sync-groups` | Rollen sofort mit den AD-Gruppen abgleichen |

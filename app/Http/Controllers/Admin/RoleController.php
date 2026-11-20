@@ -31,14 +31,7 @@ class RoleController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'ad_group_dn' => ['nullable', 'string', 'max:255'],
-            'central_email' => ['nullable', 'email', 'max:255'],
-            'sort_order' => ['required', 'integer', 'min:0'],
-            'visible_role_ids' => ['nullable', 'array'],
-            'visible_role_ids.*' => ['integer', 'exists:roles,id'],
-        ]);
+        $data = $this->validated($request);
 
         Role::create([...$data, 'in_workflow' => $request->boolean('in_workflow')]);
 
@@ -47,14 +40,7 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'ad_group_dn' => ['nullable', 'string', 'max:255'],
-            'central_email' => ['nullable', 'email', 'max:255'],
-            'sort_order' => ['required', 'integer', 'min:0'],
-            'visible_role_ids' => ['nullable', 'array'],
-            'visible_role_ids.*' => ['integer', 'exists:roles,id'],
-        ]);
+        $data = $this->validated($request);
 
         $role->update([
             ...$data,
@@ -71,5 +57,40 @@ class RoleController extends Controller
         $role->delete();
 
         return back()->with('ok', __('Rolle gelöscht.'));
+    }
+
+    /**
+     * Eingaben prüfen; die Gruppe im Verzeichnis wird zum DN aufgelöst
+     * (Directory::resolveGroups), ein mehrdeutiger Name ist ein Fehler am Feld
+     *
+     * Validate the input; the directory group is resolved to its DN
+     * (Directory::resolveGroups), an ambiguous name is an error on the field
+     */
+    private function validated(Request $request): array
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'name_en' => ['nullable', 'string', 'max:100'],
+            'ad_group_dn' => ['nullable', 'string', 'max:255'],
+            'central_email' => ['nullable', 'email', 'max:255'],
+            'sort_order' => ['required', 'integer', 'min:0'],
+            'visible_role_ids' => ['nullable', 'array'],
+            'visible_role_ids.*' => ['integer', 'exists:roles,id'],
+        ], [], [
+            'name' => __('Name'),
+            'name_en' => __('Name (EN, optional)'),
+            'ad_group_dn' => __('Gruppe im Verzeichnis (DN oder Name)'),
+            'central_email' => __('Zentrale E-Mail'),
+            'sort_order' => __('Reihenfolge'),
+        ]);
+
+        $group = \App\Support\Directory::resolveGroups($data['ad_group_dn'] ?? null);
+        if ($group['error']) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['ad_group_dn' => $group['error']]);
+        }
+        $data['ad_group_dn'] = $group['value'] !== '' ? $group['value'] : null;
+        $data['name_en'] = filled($data['name_en'] ?? null) ? trim($data['name_en']) : null;
+
+        return $data;
     }
 }

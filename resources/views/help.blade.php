@@ -22,7 +22,7 @@
             @if($u['is_admin'] ?? false)
                 <li>{{ __('Administratoren pflegen Benutzer, Rollen, Felder, Produkte und Einstellungen (Anmeldung, Zwei-Faktor, E-Mail, Lizenz, Sicherung).') }}</li>
             @endif
-            <li>{{ __('Unter „Mein Konto“ (Name oben rechts) ändern Sie Passwort, Zwei-Faktor-Anmeldung und den Fuchs-Helfer.') }}</li>
+            <li>{{ __('Unter „Mein Konto“ (Name oben rechts) ändern Sie Passwort und Zwei-Faktor-Anmeldung.') }} {{ __('Ein neues Passwort beendet Ihre anderen Anmeldungen; ein Startpasswort vom Administrator ändern Sie bei der ersten Anmeldung.') }}</li>
             <li>{{ __('Sprache (Flagge) und Hell/Dunkel (◐) stellen Sie oben rechts um.') }}</li>
         </ul>
         <p class="hint" style="margin-bottom:0">{{ __('Ausführlich im') }} <a href="{{ route('help.doc', 'user') }}">{{ __('Benutzerhandbuch') }}</a>.</p>
@@ -31,7 +31,7 @@
     {{-- 2 · System --}}
     <div class="panel">
         <h2 style="margin-top:0">🖥️ {{ __('System') }}</h2>
-        <table>
+        <table class="kv">
             <tr><th style="width:200px">{{ __('Produkt') }}</th><td>CrewGate · {{ __('HR-Prozessportal') }} · {{ \App\Support\ProductInfo::edition() }}</td></tr>
             <tr><th>{{ __('Version') }}</th><td>{{ config('version.number') }}</td></tr>
             <tr><th>{{ __('Build') }}</th><td><code>{{ config('version.build') }}</code></td></tr>
@@ -55,7 +55,7 @@
     <div class="panel">
         <h2 style="margin-top:0">📜 {{ __('Lizenz') }}</h2>
         @if($license)
-            <table>
+            <table class="kv">
                 <tr><th style="width:200px">{{ __('Lizenzname') }}</th><td>{{ __($license['name']) }}</td></tr>
                 @if($licenseCompany)<tr><th>{{ __('Lizenziert für') }}</th><td>{{ $licenseCompany }}</td></tr>@endif
                 <tr><th>{{ __('Kundennummer') }}</th><td>{{ $license['customer_no'] }}</td></tr>
@@ -80,7 +80,7 @@
     {{-- 4 · Handbücher / Manuals --}}
     <div class="panel">
         <h2 style="margin-top:0">📚 {{ __('Handbücher') }}</h2>
-        <table>
+        <table class="kv">
             @foreach($docs as $key => [$label, $file, $adminOnly, $summary])
                 @continue($adminOnly && ! $isAdmin)
                 @continue($key === 'changelog')
@@ -119,7 +119,7 @@
     <div class="panel">
         <h2 style="margin-top:0">💬 {{ __('Support') }}</h2>
         <p>{{ __('Bei Fragen oder Problemen wenden Sie sich bitte an Ihre IT-Abteilung bzw. den Systemadministrator. Halten Sie dafür die Kundennummer aus der Lizenz und die Build-Nummer bereit.') }}</p>
-        <table>
+        <table class="kv">
             <tr><th style="width:200px">🐙 GitHub</th><td>{{ __('Quellcode, Fehler melden und Ideen einbringen') }}:
                 <a href="{{ config('product.github') }}" target="_blank" rel="noopener">{{ preg_replace('#^https?://#', '', config('product.github')) }}</a>
                 · <a href="{{ rtrim(config('product.github'), '/') }}/issues" target="_blank" rel="noopener">{{ __('Fehler melden') }}</a></td></tr>

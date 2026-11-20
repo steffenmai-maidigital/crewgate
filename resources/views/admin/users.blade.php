@@ -24,25 +24,26 @@
                 {{ __('Ein Verzeichnis (Active Directory / LDAP) lässt sich unter Einstellungen → Anmeldung einschalten.') }}
             @endif
         </p>
-        <table class="manage">
-            <tr><th>{{ __('Name') }}</th><th>{{ __('Benutzername') }}</th><th>{{ __('Herkunft') }}</th><th>{{ __('Rechte') }}</th><th>{{ __('Abteilungen') }}</th><th>{{ __('Zuletzt angemeldet') }}</th><th></th></tr>
+        <table class="manage cards">
+            <tr><th>{{ __('Name') }}</th><th>{{ __('Benutzername') }}</th><th>{{ __('Herkunft') }}</th><th>{{ __('Rechte') }}</th><th>{{ __('Abteilungen') }}</th><th>{{ __('Zuletzt angemeldet') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
             @forelse($users as $u)
                 <tr @if(! $u->active) style="opacity:.55" @endif>
-                    <td><b>{{ $u->name }}</b>@if($u->department) <span class="hint">· {{ $u->department }}</span>@endif
+                    <td data-label="{{ __('Name') }}"><a href="{{ route('admin.users', ['edit' => $u->id]) }}#edit"><b>{{ $u->name }}</b></a>@if($u->department) <span class="hint">· {{ $u->department }}</span>@endif
                         @if($u->email)<br><span class="hint">{{ $u->email }}</span>@endif</td>
-                    <td><code>{{ $u->username }}</code></td>
-                    <td><span class="badge {{ $u->isLocal() ? '' : 'process' }}">{{ $u->origin() }}</span>
+                    <td data-label="{{ __('Benutzername') }}"><code>{{ $u->username }}</code></td>
+                    <td data-label="{{ __('Herkunft') }}"><span class="badge {{ $u->isLocal() ? '' : 'process' }}">{{ $u->origin() }}</span>
                         @if($u->hasTwoFactor()) <span class="badge done" title="{{ __('Zwei-Faktor eingerichtet') }}">2FA</span>@elseif(\App\Support\Mfa::isRequired($u)) <span class="badge open" title="{{ __('Zwei-Faktor ist Pflicht, aber noch nicht eingerichtet') }}">2FA !</span>@endif
+                        @if($u->mustChangePassword()) <span class="badge open" title="{{ __('Muss bei der nächsten Anmeldung ein eigenes Passwort vergeben') }}">{{ __('Startpasswort') }}</span>@endif
                         @unless($u->active) <span class="badge cancelled">{{ __('gesperrt') }}</span>@endunless</td>
-                    <td>
+                    <td data-label="{{ __('Rechte') }}">
                         @if($u->is_admin)<span class="badge done">{{ __('Admin') }}</span> @endif
                         @if($u->is_hr)<span class="badge done">{{ __('HR') }}</span> @endif
                         @if($u->can_create && ! $u->is_hr)<span class="badge open">{{ __('Vorgänge anlegen') }}</span> @endif
                         @if($u->is_auditor)<span class="badge">{{ __('Auditor') }}</span> @endif
                     </td>
-                    <td>{{ $u->roles->pluck('name')->join(', ') ?: '–' }}</td>
-                    <td class="hint">{{ $u->last_login_at?->format('d.m.Y H:i') ?? '–' }}</td>
-                    <td style="white-space:nowrap">
+                    <td data-label="{{ __('Abteilungen') }}">{{ $u->roles->map(fn ($r) => $r->displayName())->join(', ') ?: '–' }}</td>
+                    <td class="hint" data-label="{{ __('Zuletzt angemeldet') }}">{{ $u->last_login_at?->format('d.m.Y H:i') ?? '–' }}</td>
+                    <td class="actions" style="white-space:nowrap">
                         <a class="btn" style="padding:.28rem .8rem;font-size:.82rem" href="{{ route('admin.users', ['edit' => $u->id]) }}#edit">{{ __('Bearbeiten') }}</a>
                     </td>
                 </tr>
@@ -59,22 +60,31 @@
             <form method="post" action="{{ route('admin.users.update', $u) }}">
                 @csrf @method('PUT')
                 @if($u->isLocal())
-                    @include('admin.partials.user-fields', ['user' => $u, 'roles' => $roles])
-                    <label>{{ __('Neues Passwort (leer = unverändert, mindestens 8 Zeichen)') }}</label>
-                    <input type="text" name="password" value="" autocomplete="off">
+                    @include('admin.partials.user-fields', ['user' => $u, 'roles' => $roles, 'prefix' => 'edit'])
+                    <label for="edit-password">{{ __('Neues Passwort (leer = unverändert, mindestens 8 Zeichen)') }}</label>
+                    <input type="text" id="edit-password" name="password" value="" autocomplete="off" aria-describedby="edit-password-hint">
+                    <p class="hint" id="edit-password-hint">
+                        @if($u->id === (int) (session('ldap_user')['id'] ?? 0))
+                            {{ __('Andere Anmeldungen mit Ihrem Konto enden, diese bleibt.') }}
+                        @elseif(config('demo.enabled'))
+                            {{ __('Laufende Anmeldungen mit diesem Konto enden.') }}
+                        @else
+                            {{ __('Laufende Anmeldungen mit diesem Konto enden. Bei der nächsten Anmeldung muss die Person ein eigenes Passwort vergeben.') }}
+                        @endif
+                    </p>
                 @else
                     <p class="hint">{{ __('Name, E-Mail, Abteilung, Rechte und Rollen dieses Kontos kommen bei jeder Anmeldung aus dem Verzeichnis und lassen sich hier nicht ändern.') }}</p>
                     <input type="hidden" name="username" value="{{ $u->username }}"><input type="hidden" name="name" value="{{ $u->name }}">
                 @endif
                 @if($u->id !== (int) (session('ldap_user')['id'] ?? 0))
-                    <label class="choice"><input type="checkbox" name="active" value="1" @checked($u->active)> {{ __('Konto aktiv (ohne Haken: gesperrt, keine Anmeldung möglich)') }}</label>
+                    <label class="choice"><input type="checkbox" id="edit-active" name="active" value="1" @checked($u->active)> {{ __('Konto aktiv (ohne Haken: gesperrt, keine Anmeldung möglich)') }}</label>
                 @else
                     <input type="hidden" name="active" value="1">
                 @endif
                 <div class="row">
                     <div style="max-width:320px">
-                        <label>{{ __('Zwei-Faktor-Anmeldung (Ausnahme für dieses Konto)') }}</label>
-                        <select name="mfa_policy">
+                        <label for="edit-mfa-policy">{{ __('Zwei-Faktor-Anmeldung (Ausnahme für dieses Konto)') }}</label>
+                        <select id="edit-mfa-policy" name="mfa_policy">
                             <option value="" @selected(! $u->mfa_policy)>{{ __('wie Gruppe') }} ({{ \App\Support\Mfa::label(\App\Support\Mfa::policy($u->replicate(['mfa_policy']))) }})</option>
                             @foreach(\App\Support\Mfa::LEVELS as $level => $levelLabel)
                                 <option value="{{ $level }}" @selected($u->mfa_policy === $level)>{{ __($levelLabel) }}</option>
@@ -88,8 +98,8 @@
                 </div>
             </form>
             <div class="row" style="margin-top:.8rem;gap:.6rem">
-                @if($u->isLocal())
-                    <form method="post" action="{{ route('admin.users.password', $u) }}" class="inline-form" onsubmit="return confirm(@js(__('Neues Startpasswort für :name vergeben?', ['name' => $u->name])))">
+                @if($u->isLocal() && $u->id !== (int) (session('ldap_user')['id'] ?? 0))
+                    <form method="post" action="{{ route('admin.users.password', $u) }}" class="inline-form" onsubmit="return confirm(@js(__('Neues Startpasswort für :name vergeben? Laufende Anmeldungen dieses Kontos enden.', ['name' => $u->name])))">
                         @csrf <button class="primary small">{{ __('Passwort zurücksetzen') }}</button>
                     </form>
                 @endif
@@ -111,9 +121,12 @@
         <h2 style="margin-top:0">{{ __('Eigenes Konto anlegen') }}</h2>
         <form method="post" action="{{ route('admin.users.store') }}">
             @csrf
-            @include('admin.partials.user-fields', ['user' => null, 'roles' => $roles])
-            <label>{{ __('Passwort (leer = Startpasswort wird erzeugt und einmal angezeigt)') }}</label>
-            <input type="text" name="password" value="" autocomplete="off" minlength="8">
+            @include('admin.partials.user-fields', ['user' => null, 'roles' => $roles, 'prefix' => 'new'])
+            <label for="new-password">{{ __('Passwort (leer = Startpasswort wird erzeugt und einmal angezeigt)') }}</label>
+            <input type="text" id="new-password" name="password" value="" autocomplete="off" minlength="8" @unless(config('demo.enabled')) aria-describedby="new-password-hint" @endunless>
+            @unless(config('demo.enabled'))
+                <p class="hint" id="new-password-hint">{{ __('Bei der ersten Anmeldung muss die Person ein eigenes Passwort vergeben.') }}</p>
+            @endunless
             <button class="primary">{{ __('Anlegen') }}</button>
         </form>
     </div>

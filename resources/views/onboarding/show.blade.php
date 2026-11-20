@@ -24,7 +24,10 @@
                 </span>
             </div>
         </div>
-        @if($onboarding->notes)<label>{{ __('Notizen') }}</label>{{ $onboarding->notes }}@endif
+        @if($onboarding->notes && ! $headerOnly)<label>{{ __('Notizen') }}</label>{{ $onboarding->notes }}@endif
+        @if($headerOnly)
+            <p class="hint">{{ __('Sie sehen die Kopfdaten, weil der Vorgang Ihre Abteilung betrifft. Die Angaben sehen der eingetragene Vorgesetzte, HR und die beteiligten Abteilungen.') }}</p>
+        @endif
 
         <label>{{ __('Quittierungen') }}</label>
         @php($doneRoleIds = $onboarding->steps->pluck('role_id')->all())
@@ -37,19 +40,19 @@
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Aktionen (HR)') }}</h2>
             @if($onboarding->status === 'draft')
-                <p class="hint" style="margin-top:0">{{ __('Der/die Vorgesetzte wurde per E-Mail gebeten, die Angaben zu pflegen. Sie können die Angaben aber auch selbst unten ausfüllen und absenden – zum Beispiel, wenn es schnell gehen muss.') }}</p>
+                <p class="hint" style="margin-top:0">{{ __('Der Vorgesetzte wurde per E-Mail gebeten, die Angaben zu pflegen. Sie können die Angaben aber auch selbst unten ausfüllen und absenden – zum Beispiel, wenn es schnell gehen muss.') }}</p>
             @endif
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
                 @if($onboarding->status === 'draft' && $draftRoles->isNotEmpty())
                     <a class="primary small" style="text-decoration:none;padding:.45rem .9rem;border-radius:10px" href="#draft-form">{{ __('Angaben selbst pflegen') }}</a>
                 @endif
                 @if($onboarding->status !== 'done' && $onboarding->status !== 'cancelled')
-                    <form method="post" action="{{ route('onboardings.cancel', $onboarding) }}" class="inline-form" onsubmit="return confirm('{{ __('Vorgang wirklich abbrechen? Der Workflow wird gestoppt, der Vorgesetzte wird per E-Mail informiert; der Vorgang bleibt sichtbar.') }}')">
+                    <form method="post" action="{{ route('onboardings.cancel', $onboarding) }}" class="inline-form" onsubmit="return confirm(@js(__('Vorgang wirklich abbrechen? Der Workflow wird gestoppt, der Vorgesetzte wird per E-Mail informiert; der Vorgang bleibt sichtbar.')))">
                         @csrf
                         <button class="primary small danger">{{ __('Vorgang abbrechen') }}</button>
                     </form>
                 @endif
-                <form method="post" action="{{ route('onboardings.destroy', $onboarding) }}" class="inline-form" onsubmit="return confirm('{{ __('Vorgang endgültig löschen? Alle erfassten Daten werden entfernt; die Löschung wird protokolliert.') }}')">
+                <form method="post" action="{{ route('onboardings.destroy', $onboarding) }}" class="inline-form" onsubmit="return confirm(@js(__('Vorgang endgültig löschen? Alle erfassten Daten werden entfernt; die Löschung wird protokolliert.')))">
                     @csrf @method('DELETE')
                     <button class="primary small danger">{{ __('Vorgang löschen') }}</button>
                 </form>
@@ -61,11 +64,11 @@
     @if($onboarding->status === 'draft' && $draftRoles->isNotEmpty())
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Vorbereitung: Angaben für die Abteilungen pflegen') }}</h2>
-            <p class="hint">{{ __('Sie können jederzeit zwischenspeichern. Erst mit „Absenden" werden alle Abteilungen gleichzeitig per E-Mail benachrichtigt und quittieren dann einzeln den Erhalt.') }}</p>
+            <p class="hint">{{ __('Sie können jederzeit zwischenspeichern. Erst mit „Absenden“ werden alle Abteilungen gleichzeitig per E-Mail benachrichtigt und quittieren dann einzeln den Erhalt.') }}</p>
             <form method="post" action="{{ route('onboardings.draft', $onboarding) }}" id="draft-form">
                 @csrf
                 @foreach($draftRoles as $draftRole)
-                    <h2>{{ $draftRole->name }}</h2>
+                    <h2>{{ $draftRole->displayName() }}</h2>
                     @forelse($draftRole->fields as $field)
                         @include('partials.field-input', ['field' => $field, 'prefill' => $prefill])
                     @empty
@@ -74,7 +77,7 @@
                 @endforeach
                 <div class="row" style="align-items:center">
                     <div style="flex:0"><button class="primary">{{ __('Zwischenspeichern') }}</button></div>
-                    <div style="flex:0"><button class="primary" formaction="{{ route('onboardings.submit', $onboarding) }}" onclick="return confirm('{{ __('Vorgang jetzt absenden? Danach werden alle Abteilungen per E-Mail benachrichtigt.') }}')">{{ __('Absenden & Workflow starten') }}</button></div>
+                    <div style="flex:0"><button class="primary" formaction="{{ route('onboardings.submit', $onboarding) }}" onclick="return confirm(@js(__('Vorgang jetzt absenden? Danach werden alle Abteilungen per E-Mail benachrichtigt.')))">{{ __('Absenden & Workflow starten') }}</button></div>
                 </div>
             </form>
         </div>
@@ -89,7 +92,7 @@
             <h2 style="margin-top:0">{{ __('Alle Abteilungen haben quittiert') }}</h2>
             @if($user['is_hr'] ?? false)
                 <p class="hint">{{ __('Der Vorgesetzte hat die Daten ausgefüllt und alle Fachabteilungen haben die Erledigung quittiert. Sie können den Vorgang jetzt abschließend quittieren – danach beginnt die Aufbewahrungsfrist.') }}</p>
-                <form method="post" action="{{ route('onboardings.close', $onboarding) }}" onsubmit="return confirm('{{ __('Vorgang abschließen? Danach beginnt die Aufbewahrungsfrist.') }}')">
+                <form method="post" action="{{ route('onboardings.close', $onboarding) }}" onsubmit="return confirm(@js(__('Vorgang abschließen? Danach beginnt die Aufbewahrungsfrist.')))">
                     @csrf
                     <button class="primary">{{ __('Vorgang abschließen') }}</button>
                 </form>
@@ -101,7 +104,7 @@
 
     @foreach($actionRoles as $actionRole)
         <div class="panel">
-            <h2 style="margin-top:0">{{ __('Erhalt quittieren') }}: {{ $actionRole->name }}</h2>
+            <h2 style="margin-top:0">{{ __('Erhalt quittieren') }}: {{ $actionRole->displayName() }}</h2>
             <p class="hint">{{ __('Prüfen bzw. ergänzen Sie die Angaben Ihrer Abteilung und bestätigen Sie den Erhalt.') }}</p>
             <form method="post" action="{{ route('onboardings.complete', [$onboarding, $actionRole]) }}">
                 @csrf
@@ -118,14 +121,14 @@
     @if($visibleValues->isNotEmpty())
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Bisher erfasste Daten') }}</h2>
-            <table>
+            <table class="cards">
                 <tr><th>{{ __('Abteilung') }}</th><th>{{ __('Feld') }}</th><th>{{ __('Wert') }}</th><th>{{ __('Ausgefüllt von') }}</th></tr>
                 @foreach($visibleValues->sortBy(fn($v) => [$v->field?->role?->sort_order, $v->field?->sort_order]) as $v)
                     <tr>
-                        <td>{{ $v->field?->role?->name }}</td>
-                        <td>{{ $v->field?->displayLabel() }}</td>
-                        <td>{{ $v->field?->displayValue($v->value) ?? '–' }}</td>
-                        <td>{{ $v->filled_by }}</td>
+                        <td data-label="{{ __('Abteilung') }}">{{ $v->field?->role?->displayName() }}</td>
+                        <td data-label="{{ __('Feld') }}">{{ $v->field?->displayLabel() }}</td>
+                        <td data-label="{{ __('Wert') }}">{{ $v->field?->displayValue($v->value) ?? '–' }}</td>
+                        <td data-label="{{ __('Ausgefüllt von') }}">{{ $v->filled_by }}</td>
                     </tr>
                 @endforeach
             </table>
@@ -138,14 +141,14 @@
         @if($caseLogs->isNotEmpty())
             <div class="panel">
                 <h2 style="margin-top:0">{{ __('Protokoll zu diesem Vorgang') }}</h2>
-                <table>
+                <table class="cards">
                     <tr><th style="width:145px">{{ __('Zeitpunkt') }}</th><th style="width:100px">{{ __('Typ') }}</th><th style="width:130px">{{ __('Benutzer') }}</th><th>{{ __('Ereignis') }}</th></tr>
                     @foreach($caseLogs as $log)
                         <tr>
-                            <td>{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
-                            <td><span class="badge">{{ $log->type }}</span></td>
-                            <td>{{ $log->user ?? __('System') }}</td>
-                            <td>
+                            <td data-label="{{ __('Zeitpunkt') }}">{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
+                            <td data-label="{{ __('Typ') }}"><span class="badge">{{ __(\App\Models\ActivityLog::LABELS[$log->type] ?? $log->type) }}</span></td>
+                            <td data-label="{{ __('Benutzer') }}">{{ $log->user ?? __('System') }}</td>
+                            <td data-label="{{ __('Ereignis') }}">
                                 {{ $log->message }}
                                 @if($log->details)
                                     <div class="hint" style="margin-top:.25rem">
@@ -165,13 +168,13 @@
     @if($onboarding->steps->isNotEmpty())
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Quittierungen') }}</h2>
-            <table>
+            <table class="cards">
                 <tr><th>{{ __('Abteilung') }}</th><th>{{ __('Quittiert von') }}</th><th>{{ __('Am') }}</th></tr>
                 @foreach($onboarding->steps->sortBy('completed_at') as $s)
                     <tr>
-                        <td>{{ $s->role?->name }}</td>
-                        <td>{{ $s->completed_by }}</td>
-                        <td>{{ $s->completed_at?->format('d.m.Y H:i') }}</td>
+                        <td data-label="{{ __('Abteilung') }}">{{ $s->role?->displayName() }}</td>
+                        <td data-label="{{ __('Quittiert von') }}">{{ $s->completed_by }}</td>
+                        <td data-label="{{ __('Am') }}">{{ $s->completed_at?->format('d.m.Y H:i') }}</td>
                     </tr>
                 @endforeach
             </table>

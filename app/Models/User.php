@@ -27,19 +27,20 @@ class User extends Authenticatable
 
     protected $fillable = [
         'username', 'name', 'email', 'department', 'auth_source', 'ldap_dn', 'guid', 'password',
-        'is_hr', 'is_admin', 'is_auditor', 'can_create', 'active', 'fox', 'last_login_at', 'mfa_policy',
+        'must_change_password',
+        'is_hr', 'is_admin', 'is_auditor', 'can_create', 'active', 'last_login_at', 'mfa_policy',
     ];
 
     protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected $casts = [
         'password'      => 'hashed',
+        'must_change_password' => 'boolean',
         'is_hr'         => 'boolean',
         'is_admin'      => 'boolean',
         'is_auditor'    => 'boolean',
         'can_create'    => 'boolean',
         'active'        => 'boolean',
-        'fox'           => 'boolean',
         'last_login_at' => 'datetime',
         'two_factor_secret'         => 'encrypted',
         'two_factor_recovery_codes' => 'encrypted:array',
@@ -60,16 +61,6 @@ class User extends Authenticatable
     public function origin(): string
     {
         return $this->isLocal() ? __('eigenes Konto') : __('Verzeichnis');
-    }
-
-    /**
-     * Fuchs-Helfer anzeigen? Zentral abschaltbar (Admin), sonst je Person
-     *
-     * Show the fox helper? Can be switched off centrally (admin), otherwise per person
-     */
-    public function showsFox(): bool
-    {
-        return Setting::get('fox_enabled', '1') === '1' && $this->fox !== false;
     }
 
     /**
@@ -132,5 +123,48 @@ class User extends Authenticatable
     public static function initialPassword(): string
     {
         return \Illuminate\Support\Str::password(12, symbols: false);
+    }
+
+    /**
+     * Fingerabdruck des Passwort-Hashes für die Sitzung: Ändert sich das
+     * Passwort (selbst oder durch einen Admin), passt er nicht mehr, und
+     * EnsureLdapAuthenticated beendet jede andere Sitzung. HMAC mit dem
+     * APP_KEY, damit in der Sitzungsdatei nichts vom Hash selbst steht.
+     * Verzeichniskonten haben kein Passwort in der App (leerer Hash).
+     *
+     * Fingerprint of the password hash for the session: if the password
+     * changes (by the person or an admin) it no longer matches, and
+     * EnsureLdapAuthenticated ends every other session. HMAC with the
+     * APP_KEY so that nothing of the hash itself is in the session file.
+     * Directory accounts have no password in the app (empty hash).
+     */
+    public function passwordFingerprint(): string
+    {
+        return substr(hash_hmac('sha256', 'password|' . (string) ($this->attributes['password'] ?? ''), (string) config('app.key')), 0, 32);
+    }
+
+    /**
+     * Muss das Konto erst ein eigenes Passwort vergeben? Nur eigene Konten,
+     * nie im Demo-Modus (dort gilt das bekannte Passwort „demo“).
+     *
+     * Must the account set its own password first? Own accounts only,
+     * never in demo mode (the well-known password "demo" applies there).
+     */
+    public function mustChangePassword(): bool
+    {
+        return (bool) $this->must_change_password && $this->isLocal() && ! config('demo.enabled');
+    }
+
+    /**
+     * Ein Admin (oder der Notzugang) vergibt ein Passwort: Die Person muss es
+     * bei der nächsten Anmeldung ändern – außer im Demo-Modus.
+     *
+     * An admin (or the emergency access) assigns a password: the person must
+     * change it at the next sign-in – except in demo mode.
+     */
+    public function assignInitialPassword(#[\SensitiveParameter] string $password): void
+    {
+        $this->password = $password;
+        $this->must_change_password = ! config('demo.enabled');
     }
 }

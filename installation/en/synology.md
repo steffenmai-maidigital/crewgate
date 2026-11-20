@@ -32,11 +32,12 @@
 
 ## 2. Adjust the settings
 
-For a trial everything can stay as it is: CrewGate starts in demo mode. For
+For a trial set `DEMO_MODE: "true"`; CrewGate then starts in demo mode (it ships
+with `"false"`). For
 production open `docker-compose.yml` with the DSM **Text Editor** package, or
 edit it later in Container Manager under **Project → YAML configuration**:
 
-- `DEMO_MODE: "false"`
+- `DEMO_MODE: "false"` (the default; set it back after a trial)
 - `APP_URL: "https://onboarding.firma.de"` (or for now `http://<NAS-IP>:7101`)
 - the `LDAP_*` and `AD_GROUP_*` lines: remove the `#` at the start of the line
   and enter your own values. What goes where is explained in
@@ -63,6 +64,11 @@ the password `demo`. For production log in with an account from the
 administrators group and fill in **Settings** (company, e-mail with portal link,
 permissions), then read the AD groups under **Roles**. The detailed order is
 in [docker.md](docker.md#33-set-it-up-in-the-web-interface).
+
+Switching from demo mode to production without emptying the database: the
+demo accounts get new initial passwords on the first start (in the container
+log, **Container → crewgate → Log**); demo accounts without the admin right
+are locked. See [docker.md](docker.md#32-restart).
 
 ## 5. HTTPS via the DSM reverse proxy
 

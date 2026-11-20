@@ -22,10 +22,9 @@ class LogController extends Controller
         return view('logs', [
             'logs' => $logs,
             'type' => $type,
-            'types' => ['' => 'Alle Einträge'] + array_intersect_key(ActivityLog::LABELS, array_flip([
-                ActivityLog::TYPE_CASE, ActivityLog::TYPE_FIELD, ActivityLog::TYPE_STEP,
-                ActivityLog::TYPE_MAIL, ActivityLog::TYPE_DELETION, ActivityLog::TYPE_SETTINGS,
-            ])),
+            // alle Typen filterbar, auch Benutzer, Anmeldungen und Exporte
+            // every type can be filtered, including users, sign-ins and exports
+            'types' => ['' => 'Alle Einträge'] + ActivityLog::LABELS,
         ]);
     }
 
@@ -94,7 +93,7 @@ class LogController extends Controller
 
             ActivityLog::orderBy('id')->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $log) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map([self::class, 'csvCell'], [
                         $log->id,
                         $log->created_at->format('Y-m-d H:i:s'),
                         $log->type,
@@ -105,11 +104,29 @@ class LogController extends Controller
                         $log->message,
                         $log->details ? json_encode($log->details, JSON_UNESCAPED_UNICODE) : '',
                         $log->hash,
-                    ], ';');
+                    ]), ';');
                 }
             });
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Schutz vor Formeln in Tabellenprogrammen: Beginnt ein Wert mit = + - @,
+     * Tabulator, Wagenrücklauf oder Apostroph, bekommt er ein Apostroph davor.
+     * Für die Hash-Prüfung genau ein führendes Apostroph wieder entfernen.
+     *
+     * Protection against formulas in spreadsheet programs: a value starting
+     * with = + - @, tab, carriage return or apostrophe gets an apostrophe in
+     * front. For the hash check remove exactly one leading apostrophe again.
+     */
+    public static function csvCell(mixed $value): mixed
+    {
+        if (is_string($value) && $value !== '' && str_contains("=+-@\t\r'", $value[0])) {
+            return "'" . $value;
+        }
+
+        return $value;
     }
 }

@@ -7,7 +7,7 @@
 | Modul | Zweck | Rolle |
 |---|---|---|
 | Übersicht (Dashboard) | Kennzahlen, eigene Aufgaben, offene/abgeschlossene Vorgänge, Workflow-Kette | alle |
-| Vorgang anlegen | Einzelanlage mit AD-Suche, Prozessart, Fristen; CSV-Import-Assistent für Sammel-Anlagen | HR / Ersteller-Gruppe |
+| Vorgang anlegen | Einzelanlage mit Vorgesetzten-Suche, Prozessart, Fristen; CSV-Import-Assistent für Sammel-Anlagen | HR / Ersteller-Gruppe |
 | Vorbereitung | Vorgesetzter pflegt die Abteilungs-Felder (Zwischenspeichern/Absenden) | Vorgesetzter, HR |
 | Quittieren | Abteilungen bestätigen Erhalt & Umsetzung ihrer Daten | Rollen-Mitglieder |
 | Prozesse | Eigene Prozessarten mit verkürztem Workflow (beteiligte Abteilungen je Prozess) | HR, Admin |

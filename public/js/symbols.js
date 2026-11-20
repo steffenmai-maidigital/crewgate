@@ -1,6 +1,6 @@
 /*
  * Einheitliche Symbole in der Oberfläche (gemeinsamer Baustein, Standard 03).
- * Emojis in Menüs, Knöpfen, Überschriften, Dialogen und Fuchs-Blasen werden
+ * Emojis in Menüs, Knöpfen, Überschriften, Dialogen und Sprechblasen werden
  * gegen die Twemoji-Grafiken unter /img/emoji ausgetauscht, damit sie auf jedem
  * Gerät gleich aussehen. Auch später eingefügte Inhalte werden erfasst.
  * Eingabefelder, Code und reine Textzeichen (→ ✓ ▶ ◐) bleiben, wie sie sind.
@@ -11,7 +11,7 @@
  * Grafiken sammeln die Werkzeuge der Betreuer ein.
  *
  * Uniform symbols in the interface (shared building block, Standard 03).
- * Emojis in menus, buttons, headings, dialogs and fox speech bubbles are
+ * Emojis in menus, buttons, headings, dialogs and speech bubbles are
  * swapped for the Twemoji graphics under /img/emoji so that they look the
  * same on every device. Content inserted later is covered as well.
  * Input fields, code and plain text characters (→ ✓ ▶ ◐) stay as they are.

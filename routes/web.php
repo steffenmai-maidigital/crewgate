@@ -18,7 +18,11 @@ require __DIR__ . '/legacy.php';
 Route::get('/locale/{locale}', function (string $locale) {
     abort_unless(in_array($locale, ['de', 'en'], true), 404);
     session(['locale' => $locale]);
-    return redirect()->back();
+    // Zurück nur auf eigene Seiten, nie auf eine fremde Adresse aus dem Referer
+    // Back only to own pages, never to a foreign address from the referer
+    $previous = url()->previous();
+    $own = rtrim(url('/'), '/');
+    return redirect()->to($previous === $own || str_starts_with($previous, $own . '/') ? $previous : route('dashboard'));
 })->name('locale.switch');
 
 // Impressum und Datenschutz: öffentlich, auch ohne Anmeldung
@@ -45,13 +49,14 @@ Route::middleware('ldap.auth')->group(function () {
     // Help (Standard 03): quick guide, system, licence, manuals, changelog, errors, support
     Route::get('/help', [\App\Http\Controllers\HelpController::class, 'show'])->name('help');
     Route::get('/help/manual/{doc}', [\App\Http\Controllers\HelpController::class, 'doc'])->name('help.doc');
-    Route::delete('/help/log', [\App\Http\Controllers\HelpController::class, 'clearLog'])->name('help.clear-log');
+    // Protokoll leeren: Admin-Middleware und Prüfung im Controller (Standard 06)
+    // Clear the log: admin middleware and check in the controller (Standard 06)
+    Route::delete('/help/log', [\App\Http\Controllers\HelpController::class, 'clearLog'])->middleware('role.admin')->name('help.clear-log');
     Route::get('/support', fn () => redirect()->route('help'));   // alte Adresse / old address
-    // Eigenes Konto: Passwort, Zwei-Faktor, Fuchs-Helfer
-    // Own account: password, two-factor, fox helper
+    // Eigenes Konto: Passwort, Zwei-Faktor
+    // Own account: password, two-factor
     Route::get('/account', [\App\Http\Controllers\AccountController::class, 'show'])->name('account');
     Route::put('/account/password', [\App\Http\Controllers\AccountController::class, 'password'])->name('account.password');
-    Route::post('/account/fox', [\App\Http\Controllers\AccountController::class, 'fox'])->name('account.fox');
     Route::post('/account/2fa', [\App\Http\Controllers\AccountController::class, 'startTwoFactor'])->name('account.2fa.start');
     Route::post('/account/2fa/confirm', [\App\Http\Controllers\AccountController::class, 'confirmTwoFactor'])->name('account.2fa.confirm');
     Route::post('/account/2fa/codes', [\App\Http\Controllers\AccountController::class, 'recoveryCodes'])->name('account.2fa.codes');

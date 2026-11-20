@@ -36,7 +36,11 @@ class OnboardingController extends Controller
         try {
             $result = $ldap->findUser($request->string('q'));
         } catch (\Throwable $e) {
-            return response()->json(['error' => __('Verzeichnis nicht erreichbar: :fehler', ['fehler' => $e->getMessage()])], 502);
+            // Einzelheiten nur ins Protokoll, nicht in die Antwort
+            // Details only into the log, not into the response
+            report($e);
+
+            return response()->json(['error' => __('Das Verzeichnis ist gerade nicht erreichbar. Bitte später erneut versuchen oder den Administrator informieren.')], 502);
         }
 
         if (! $result) {
@@ -134,7 +138,7 @@ class OnboardingController extends Controller
         MailService::notifySupervisor($onboarding);
 
         return redirect()->route('onboardings.show', $onboarding)
-            ->with('ok', __('Vorgang angelegt. Der/die Vorgesetzte wurde per E-Mail informiert und kann die Daten jetzt pflegen.'));
+            ->with('ok', __('Vorgang angelegt. Der Vorgesetzte wurde per E-Mail informiert und kann die Daten jetzt pflegen.'));
     }
 
     /**
@@ -363,6 +367,22 @@ class OnboardingController extends Controller
     }
 
     /**
+     * Ist der angemeldete Benutzer der eingetragene Vorgesetzte des Vorgangs?
+     * Maßgeblich ist der Benutzername, nicht die gleiche Abteilung – sonst
+     * sähen alle Kollegen der Abteilung die Daten (auch Austritte).
+     *
+     * Is the signed-in user the supervisor entered for the case? The user name
+     * counts, not the same department – otherwise every colleague of the
+     * department would see the data (exits included).
+     */
+    private function isSupervisor(Onboarding $onboarding): bool
+    {
+        $username = mb_strtolower((string) ($this->user()['username'] ?? ''));
+
+        return $username !== '' && mb_strtolower(trim((string) $onboarding->supervisor_username)) === $username;
+    }
+
+    /**
      * Berechtigung: darf die Vorbereitung pflegen (Vorgesetzter, HR, Ersteller)
      *
      * Permission: may maintain the preparation (supervisor, HR, creator)
@@ -373,7 +393,7 @@ class OnboardingController extends Controller
 
         return ($user['is_hr'] ?? false)
             || $onboarding->created_by === ($user['username'] ?? null)
-            || (! empty($user['department']) && $user['department'] === $onboarding->department);
+            || $this->isSupervisor($onboarding);
     }
 
     /**
@@ -447,8 +467,8 @@ class OnboardingController extends Controller
         ];
         foreach ($fields as $field) {
             $rules = array_merge($rules, $field->rulesFor('fields.' . $field->id, $forceOptional));
-            $attributes['fields.' . $field->id] = ($field->role?->name ? $field->role->name . ' – ' : '') . $field->displayLabel();
-            $attributes['fields.' . $field->id . '.*'] = ($field->role?->name ? $field->role->name . ' – ' : '') . $field->displayLabel();
+            $attributes['fields.' . $field->id] = ($field->role ? $field->role->displayName() . ' – ' : '') . $field->displayLabel();
+            $attributes['fields.' . $field->id . '.*'] = ($field->role ? $field->role->displayName() . ' – ' : '') . $field->displayLabel();
             if ($field->regex_hint) {
                 $messages['fields.' . $field->id . '.regex'] = $field->label . ': ' . $field->regex_hint;
             }
@@ -476,16 +496,42 @@ class OnboardingController extends Controller
         }
     }
 
+    /**
+     * Darf der Benutzer den Vorgang öffnen? HR, Administratoren, Auditoren und
+     * Mitglieder einer Abteilung im Workflow sehen alle Vorgänge (Abteilungen nur
+     * eingeschränkt), der eingetragene Vorgesetzte und der Ersteller ihre.
+     * Kollegen derselben Abteilung sehen nur die Kopfdaten (siehe show()).
+     * Alle anderen bekommen 403 – auch mit erratener Nummer.
+     *
+     * May the user open the case? HR, administrators, auditors and members of
+     * a department in the workflow see all cases (departments restricted), the
+     * supervisor entered and the creator see theirs. Colleagues of the same
+     * department only see the header data (see show()). Everyone else gets
+     * 403 – even with a guessed number.
+     */
+    private function mayView(Onboarding $onboarding): bool
+    {
+        $user = $this->user();
+
+        return ($user['is_hr'] ?? false)
+            || ($user['is_admin'] ?? false)
+            || ($user['is_auditor'] ?? false)
+            || ! empty($user['role_ids'])
+            || $onboarding->created_by === ($user['username'] ?? null)
+            || $this->isSupervisor($onboarding)
+            || (! empty($user['department']) && $user['department'] === $onboarding->department);
+    }
+
     /** Detailansicht / Detail view */
     public function show(Onboarding $onboarding)
     {
+        abort_unless($this->mayView($onboarding), 403, 'Dieser Vorgang gehört nicht zu Ihrer Abteilung.');
         $user = $this->user();
         $onboarding->load(['values.field.role', 'steps.role']);
 
-        // Der Vorgesetzte (gleiche AD-Abteilung) pflegt die Vorbereitung.
-        // The supervisor (same AD department) maintains the preparation.
-        $isSupervisor = ! empty($user['department'])
-            && $user['department'] === $onboarding->department;
+        // Der eingetragene Vorgesetzte pflegt die Vorbereitung und sieht alles
+        // The supervisor entered maintains the preparation and sees everything
+        $isSupervisor = $this->isSupervisor($onboarding);
 
         // Sichtbarkeit der erfassten Daten: HR, Admin, Auditor, Vorgesetzte
         // und der anlegende Benutzer sehen alles. Abteilungs-Benutzer sehen
@@ -499,8 +545,14 @@ class OnboardingController extends Controller
             || $isSupervisor
             || $onboarding->created_by === ($user['username'] ?? null);
 
+        // Nur über die gleiche Abteilung hier: Kopfdaten ohne Notizen und Feldwerte
+        // Here only via the same department: header data without notes and field values
+        $headerOnly = ! $seesAll && empty($user['role_ids']);
+
         $visibleValues = $onboarding->values;
-        if (! $seesAll) {
+        if ($headerOnly) {
+            $visibleValues = collect();
+        } elseif (! $seesAll) {
             $own = $user['role_ids'] ?? [];
             $shared = Role::whereIn('id', $own)->get()
                 ->flatMap(fn ($r) => $r->visible_role_ids ?? [])
@@ -554,6 +606,7 @@ class OnboardingController extends Controller
             'prefill'       => $prefill,
             'draftRoles'    => $draftRoles,
             'actionRoles'   => $actionRoles,
+            'headerOnly'    => $headerOnly,
         ]);
     }
 
@@ -679,6 +732,9 @@ class OnboardingController extends Controller
     {
         abort_unless($this->user()['is_hr'] ?? false, 403, 'Nur HR darf Vorgänge abbrechen.');
         abort_if($onboarding->status === 'done', 404, 'Abgeschlossene Vorgänge können nicht abgebrochen werden.');
+        // schon abgebrochen: nicht noch einmal protokollieren und keine zweite Mail
+        // already cancelled: do not log again and send no second mail
+        abort_if($onboarding->status === 'cancelled', 404, 'Der Vorgang ist bereits abgebrochen.');
 
         $onboarding->update(['status' => 'cancelled', 'current_role_id' => null]);
 

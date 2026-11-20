@@ -111,12 +111,19 @@ nur angelegt, wenn die Datenbank noch keine Vorgänge enthält.
 
 ## 4. Einstellungen
 
-Menüpunkt **Einstellungen** (nur Administratoren). Die Seite ist in sieben
-Bereiche gegliedert.
+Menüpunkt **Einstellungen** (nur Administratoren). Die Seite ist in zehn
+nummerierte Bereiche gegliedert (1 Firma & Erscheinungsbild, 2 E-Mail-Versand,
+3 Anmeldung, 4 Berechtigungen, 5 Aufbewahrung, 6 Audit-Bericht, 7 Lizenz,
+8 E-Mail-Vorlagen, 9 API, 10 Impressum und Datenschutz). Darunter stehen die
+Knöpfe *Verbindung testen*, *Neues Token generieren*, *Jetzt sichern* und
+*Testmail senden*.
 
 ### 4.1 Firma & Erscheinungsbild
 Firmenname, Logo-Upload (PNG/JPG/SVG/WebP, max. 2 MB), Header-, Akzent- und
-Footer-Farbe sowie Footer-Text. Die Farben gelten in hellem und dunklem Modus
+Footer-Farbe sowie Footer-Text. Ein SVG-Logo darf keine Skripte, Ereignisse
+(`onload` …), Verweise nach außen oder eingebetteten Inhalte enthalten; sonst
+lehnt CrewGate es mit einer Meldung ab. Die Dateiendung bestimmt der Inhalt der
+Datei, nicht ihr Name. Die Farben gelten in hellem und dunklem Modus
 und erscheinen auch im PDF-Audit-Bericht.
 
 ### 4.1a Fristen & Erinnerungen (Texte anpassbar)
@@ -139,6 +146,11 @@ Passwort (leer lassen = unverändert), Absenderadresse und -name.
 **Portal-Link für E-Mails**: Der pauschale Link, der in allen E-Mails steht
 (z. B. `https://onboarding.firma.local`). Es wird nie direkt auf einen Vorgang
 verlinkt. Leer = `APP_URL`.
+
+**Erinnerung an die Abteilungen**: Schalter für die Erinnerungen an
+Abteilungen, deren Frist erreicht ist und die noch nicht quittiert haben (siehe
+4.1a). Die Erinnerung an den Vorgesetzten ist immer aktiv, sobald eine Frist
+gesetzt ist.
 
 Ganz unten auf der Seite: **SMTP testen** – verschickt eine Testmail, die
 ebenfalls im Mail-Log landet.
@@ -165,21 +177,53 @@ Abteilung und Rechte kommen bei jeder Anmeldung neu aus dem Verzeichnis.
 Ein eigenes Konto mit gleichem Benutzernamen hat Vorrang.
 
 Notzugang, falls das Verzeichnis ausfällt oder niemand mehr hineinkommt:
-`docker exec crewgate php artisan crewgate:admin-password` legt ein eigenes
-Admin-Konto an bzw. setzt dessen Passwort neu.
+`docker exec crewgate php artisan crewgate:admin-password [name]` legt ein
+eigenes Admin-Konto an bzw. setzt dessen Passwort neu. Das ausgegebene
+Passwort ist ein Startpasswort, laufende Sitzungen des Kontos enden.
+`--disable-2fa` setzt zusätzlich die Zwei-Faktor-Anmeldung dieses Kontos
+zurück (Handy verloren). Jeder Aufruf steht im Protokoll.
 
 **Zwei-Faktor-Anmeldung** (gleicher Abschnitt): je Gruppe Pflicht, wählbar
 oder aus — Administratoren, HR, Auditoren, Vorgänge anlegen, Abteilungen,
 alle übrigen; Verzeichnisgruppen mit Pflicht (eine je Zeile). Die strengste
 Stufe gewinnt. Pflicht ohne Einrichtung sperrt die Anwendung bis zur
-Einrichtung unter **Mein Konto** (QR-Code, Wiederherstellungscodes).
+Einrichtung unter **Mein Konto** (QR-Code, Wiederherstellungscodes). Eine
+strengere Stufe gilt ab der nächsten Seite, auch für bereits angemeldete
+Benutzer; eine mildere erst nach der nächsten Anmeldung. Verzeichnisgruppen
+mit Pflicht wirken ab der nächsten Anmeldung.
 Ausnahmen je Benutzer und „Zwei-Faktor zurücksetzen“ (Handy verloren) unter
 **Benutzer → Bearbeiten**.
+
+### 4.3a Eigene Konten und Startpasswort
+Menü **Benutzer**: eigene Konten anlegen, Rechte und Abteilungen vergeben,
+sperren, löschen. Verzeichniskonten erscheinen nach der ersten Anmeldung und
+lassen sich nur sperren.
+
+- **Startpasswort:** Ein Passwort, das der Administrator vergibt (beim
+  Anlegen, unter **Bearbeiten → Neues Passwort** oder per **Passwort
+  zurücksetzen**), muss die Person bei der nächsten Anmeldung durch ein
+  eigenes ersetzen. Dasselbe gilt für den ersten Admin mit Zufallspasswort und
+  für den Notzugang. Bis dahin öffnen sich nur **Mein Konto** und
+  **Abmelden**, auch keine Hilfe. Die Liste zeigt solche Konten mit
+  „Startpasswort“. Im Demo-Modus gilt das nicht.
+- **Sitzungen:** Ein neues Passwort beendet alle anderen Anmeldungen des
+  Kontos. Ändert jemand sein Passwort selbst, bleibt seine laufende Sitzung;
+  setzt der Admin es zurück, enden alle. Das eigene Passwort ändert der Admin
+  unter **Mein Konto** (oder im eigenen Bearbeiten-Formular), nicht per
+  „Passwort zurücksetzen“.
 
 ### 4.4 Berechtigungen (Gruppen im Verzeichnis)
 Für Verzeichniskonten hängen die Rechte an Gruppen — als vollständiger DN
 oder nur als Gruppenname; verschachtelte AD-Gruppen werden aufgelöst. Für
 eigene Konten vergibt der Administrator dieselben Rechte unter **Benutzer**.
+
+Ist das Verzeichnis eingeschaltet, löst CrewGate einen Gruppennamen beim
+Speichern zum vollständigen DN auf und speichert den DN – für diese vier
+Gruppen, die **Verzeichnisgruppen mit Pflicht** (Abschnitt 3) und die Gruppe je
+Rolle. Gibt es den Namen in mehreren OUs, erscheint eine Meldung am Feld, und
+der alte Wert bleibt; die übrigen Einstellungen sind gespeichert. Dann den
+vollständigen DN eintragen. Ist das Verzeichnis aus oder nicht erreichbar,
+bleibt die Eingabe, wie sie ist.
 
 | Einstellung | Wirkung |
 |---|---|
@@ -188,7 +232,9 @@ eigene Konten vergibt der Administrator dieselben Rechte unter **Benutzer**.
 | **Administratoren-Gruppe** | Benutzer, Rollen, Einstellungen, Kategorien, alle Felder und Produkte, Mail-Log, Protokoll |
 | **Auditoren-Gruppe** | optional – lesender Zugriff auf das gesamte Protokoll inkl. Exporte |
 
-Änderungen wirken ab der nächsten Anmeldung der betroffenen Benutzer.
+Änderungen an den Gruppen wirken ab der nächsten Anmeldung der betroffenen
+Benutzer. Rechte eigener Konten (Menü **Benutzer**) gelten dagegen ab der
+nächsten Seite; ein gesperrtes oder gelöschtes Konto wird sofort abgemeldet.
 
 ### 4.5 Aufbewahrung & automatische Löschung
 Schalter *Abgeschlossene Vorgänge automatisch löschen* plus Frist in Monaten
@@ -200,15 +246,7 @@ Optional: am **1. des Monats um 06:00 Uhr** geht der PDF-Bericht automatisch
 raus – entweder an eine feste Adresse oder an die E-Mail-Adressen aller
 Mitglieder der Auditoren-Gruppe (aus dem AD gelesen).
 
-### 4.7 E-Mail-Vorlagen
-Die Texte der Vorgesetzten-Mail und der Rollen-Benachrichtigung lassen sich je
-Sprache anpassen (leer = eingebauter Standardtext). Platzhalter: `{name}`,
-`{department}`, `{date}`, `{role}`, `{data}`, `{link}`, `{supervisor}`.
-Der Standardtext fordert die Abteilungen auf, sich im Portal einzuloggen und
-**Erhalt und Umsetzung zu quittieren** – mit dem Portal-Link aus den
-Einstellungen. Versendet wird immer zweisprachig (erst Deutsch, dann Englisch).
-
-### 4.8 Lizenz
+### 4.7 Lizenz
 Firma (Lizenznehmer) und 20-stelliger Lizenzschlüssel. Aufbau:
 
 | Stellen | Bedeutung |
@@ -226,7 +264,25 @@ sonst erscheint eine Fehlermeldung mit dem Schema. Die Anzeige erfolgt im
 Footer unter **Hilfe**; ein abgelaufener Support wird rot angezeigt,
 hat aber **keine funktionalen Auswirkungen**.
 
-### 4.9 Impressum und Datenschutz
+### 4.8 E-Mail-Vorlagen
+Die Texte der Vorgesetzten-Mail und der Rollen-Benachrichtigung lassen sich je
+Sprache anpassen (leer = eingebauter Standardtext). Platzhalter: `{name}`,
+`{department}`, `{date}`, `{role}`, `{data}`, `{link}`, `{supervisor}`.
+`{role}` ist im englischen Text der englische Name der Rolle (falls gepflegt).
+Der Standardtext fordert die Abteilungen auf, sich im Portal einzuloggen und
+**Erhalt und Umsetzung zu quittieren** – mit dem Portal-Link aus den
+Einstellungen. Versendet wird immer zweisprachig (erst Deutsch, dann Englisch).
+
+### 4.9 API (v2)
+API-Token für die Schnittstelle `/api/v2/cases` (die alte Adresse
+`/api/v2/vorgaenge` gilt weiter). Leeres Feld = API aus. Unten auf der Seite
+erzeugt **Neues Token generieren** ein zufälliges Token mit 48 Zeichen; das
+bisherige wird sofort ungültig. Beim Anlegen prüft die API die Anlage-Felder
+wie das Formular (Pflicht, Format, Auswahl) und nimmt nur aktive Prozesse an;
+sonst antwortet sie mit 422 und den Fehlern je Feld. Einzelheiten in der
+API-Dokumentation.
+
+### 4.10 Impressum und Datenschutz
 Beide Seiten lassen sich einzeln einschalten – als eigener Text oder als Link
 auf eine vorhandene Seite (z. B. die Firmen-Homepage). Eingeschaltete Seiten
 sind ohne Anmeldung erreichbar (`/imprint`, `/privacy`) und stehen auf
@@ -247,7 +303,13 @@ Abteilung im Workflow.
   (läuft zusätzlich nächtlich automatisch)
 - **Reihenfolge** – bestimmt die Sortierung in Listen, Formularen, Mails und
   Exporten
-- **AD-Gruppe (DN)** – wer Mitglied ist, darf für diese Rolle quittieren
+- **Name (EN, optional)** – englischer Name der Abteilung. Die englische
+  Oberfläche zeigt ihn (Workflow, Übersicht, Vorgang, Quittierungen, Felder,
+  Produkte, Prozesse, Benutzer), sonst den deutschen Namen. In den
+  zweisprachigen E-Mails steht er im englischen Teil, im Audit-Bericht neben
+  dem deutschen
+- **Gruppe im Verzeichnis (DN oder Name)** – wer Mitglied ist, darf für diese
+  Rolle quittieren; ein Name wird beim Speichern zum DN aufgelöst (siehe 4.4)
 - **Zentrale E-Mail** – Empfängeradresse der Benachrichtigung. Fehlt sie, wird
   das im Protokoll vermerkt und keine Mail versendet
 - **Sieht Daten von** – Mehrfachauswahl: welche anderen Rollen diese Rolle
@@ -326,7 +388,7 @@ Weitere Eigenschaften:
 
 ---
 
-## 7. Produkte und Kategorien
+## 8. Produkte und Kategorien
 
 Menüpunkt **Produkte**.
 
@@ -344,7 +406,7 @@ löscht Produkte, die seit mehr als 6 Monaten deaktiviert sind.
 
 ---
 
-## 8. Mail-Log
+## 9. Mail-Log
 
 Menüpunkt **Mail-Log** (Administratoren). Zeigt jede ausgehende E-Mail mit
 Zeitstempel, Empfänger, Betreff, Status (gesendet/fehlgeschlagen, ggf. mit
@@ -354,7 +416,7 @@ Demo-Modus werden Mails nicht zugestellt, aber vollständig protokolliert.
 
 ---
 
-## 9. Protokoll und Audit
+## 10. Protokoll und Audit
 
 Menüpunkt **Protokoll** (HR, Administratoren, Auditoren). Jeder Eintrag ist
 über eine **SHA-256-Hash-Kette** mit seinem Vorgänger verknüpft; nachträgliche
@@ -365,13 +427,16 @@ Protokolliert werden: Anlage, Datenpflege, Quittierungen, Abschluss, Abbruch,
 Löschungen (automatisch und manuell), E-Mail-Versand, Einstellungsänderungen
 und Exporte.
 
-- **CSV-Export** mit zweisprachigen Spaltenköpfen
+- **CSV-Export** mit zweisprachigen Spaltenköpfen. Zellen, die mit `=`, `+`,
+  `-`, `@`, Tabulator oder Apostroph beginnen, bekommen ein Apostroph davor,
+  damit Tabellenprogramme sie nicht als Formel ausführen. Wer die Hash-Kette
+  aus dem Export nachrechnet, entfernt dieses eine Apostroph vorher.
 - **PDF-Audit-Bericht** mit Firmen-Branding, Export-Zeitstempel, Löschungen,
   den zuletzt eingestellten Mitarbeitern und dem vollständigen Protokoll
 
 ---
 
-## 10. Zeitgesteuerte Aufgaben
+## 11. Zeitgesteuerte Aufgaben
 
 | Zeit | Aufgabe |
 |---|---|
@@ -385,14 +450,18 @@ nicht – der Rest der Anwendung funktioniert weiter.
 
 ---
 
-## 11. Betrieb
+## 12. Betrieb
 
 **Sicherung.** Jede Nacht um 02:30 Uhr legt der Scheduler ein ZIP mit
-Datenbank (konsistent per `VACUUM INTO`) und Uploads samt SHA-256-Prüfsumme im
-Ordner `./backups` ab; aufbewahrt wird `BACKUP_KEEP_DAYS` Tage (Standard 14,
-mindestens 4). **Einstellungen → Sicherung → Jetzt sichern** legt zusätzlich
-eine Sicherung unter `./backups/manual` ab, die nie automatisch gelöscht wird.
-Wiederherstellung und Umzug: `installation/betrieb.md`.
+Datenbank (konsistent per `VACUUM INTO`), Schlüssel `.app_key` und Uploads samt
+SHA-256-Prüfsumme im Ordner `./backups` ab; aufbewahrt wird `BACKUP_KEEP_DAYS`
+Tage (Standard 14, mindestens 4). **Einstellungen → Sicherung → Jetzt
+sichern** legt zusätzlich eine Sicherung unter `./backups/manual` ab, die nie
+automatisch gelöscht wird. Mit `.app_key` sind das Servicekonto-Passwort und
+die Zwei-Faktor-Geheimnisse nach einer Wiederherstellung auf neuer Hardware
+lesbar. Die Sicherungen bleiben auf dem Server (kein Download im Browser);
+den Ordner `backups` nur Administratoren zugänglich machen. Wiederherstellung
+und Umzug: `installation/betrieb.md`.
 
 **Logs.** `docker compose logs -f app` bzw. die Protokollansicht der
 Container-Oberfläche.
@@ -402,8 +471,11 @@ Container-Oberfläche.
 | Symptom | Ursache / Lösung |
 |---|---|
 | Keine Mails, aber Einträge im Mail-Log mit „fehlgeschlagen" | SMTP-Daten prüfen, Testmail nutzen; die Fehlermeldung steht im Log |
-| Anmeldung schlägt fehl | eigenes Konto: Passwort unter **Benutzer** zurücksetzen; Verzeichnis: **Einstellungen → Anmeldung → Verbindung testen**, Benutzerattribut und Filter prüfen; Notzugang `crewgate:admin-password` |
-| Benutzer sieht Menüpunkte nicht | eigenes Konto: Rechte unter **Benutzer**; Verzeichniskonto: Gruppen in den Einstellungen prüfen; Neuanmeldung nötig |
+| Anmeldung schlägt fehl | eigenes Konto: Passwort unter **Benutzer** zurücksetzen; Verzeichnis: **Einstellungen → Anmeldung → Verbindung testen**, Benutzerattribut und Filter prüfen; Notzugang `crewgate:admin-password` (bei verlorenem Handy mit `--disable-2fa`) |
+| Benutzer landet immer auf **Mein Konto** | Startpasswort noch nicht geändert oder Zwei-Faktor Pflicht und nicht eingerichtet; die Kontoseite nennt den Grund |
+| Plötzlich abgemeldet: „Das Passwort dieses Kontos wurde geändert“ | Das Passwort wurde in einer anderen Sitzung oder vom Admin geändert; mit dem neuen Passwort anmelden |
+| „Die Gruppe … gibt es mehrfach im Verzeichnis“ | Der Gruppenname steht in mehreren OUs; den vollständigen DN eintragen |
+| Benutzer sieht Menüpunkte nicht | eigenes Konto: Rechte unter **Benutzer** (wirken ab der nächsten Seite); Verzeichniskonto: Gruppen in den Einstellungen prüfen, dann neu anmelden |
 | Rollen fehlen | von Hand anlegen oder „Gruppen aus dem Verzeichnis einlesen“, ggf. Gruppenfilter prüfen |
 | Alte Optik nach Update | Browser-Cache: Strg+F5 |
 | Scheduler startet in Schleife neu, Log: „bootstrap/cache directory must be present and writable" | Image ohne www-data-Rechte auf bootstrap/cache – einmal mit Image-Neubau aktualisieren (`docker compose up -d --build` bzw. Projekt neu erstellen); ab diesem Build setzt Image und Entrypoint die Rechte selbst |
@@ -412,10 +484,11 @@ Container-Oberfläche.
 
 ---
 
-## 12. Berechtigungen auf einen Blick
+## 13. Berechtigungen auf einen Blick
 
 | Aktion | HR | Admin | Rolle | Vorgesetzter | Auditor |
 |---|:--:|:--:|:--:|:--:|:--:|
+| Vorgang öffnen | ✓ alle | ✓ alle | ✓ alle (eingeschränkte Daten) | ✓ als Vorgesetzter eingetragen (Abteilung: nur Kopfdaten) | ✓ alle |
 | Vorgang anlegen | ✓ | | | | |
 | Daten in der Vorbereitung pflegen / absenden | ✓ | | | ✓ | |
 | Erhalt quittieren | | (✓) | ✓ | | |
@@ -426,15 +499,16 @@ Container-Oberfläche.
 | Protokoll und Exporte | ✓ | ✓ | | | ✓ |
 
 (✓) = Administratoren können ersatzweise quittieren, wenn eine Abteilung
-blockiert ist.
+blockiert ist. Konten ohne eines dieser Rechte öffnen nur Vorgänge, die sie
+selbst angelegt haben; jede andere Vorgangsnummer ergibt Fehler 403.
 
 
-## 9. API v2
+## 14. API v2
 
 Die vollständige API-Dokumentation steht in `docs/API.md` (Aktivierung,
 Authentifizierung, Endpunkte, Beispiele, Sicherheitsempfehlungen).
 
-## 10. CSV-Massenimport (HR) – geführter Assistent
+## 15. CSV-Massenimport (HR) – geführter Assistent
 
 Der Import läuft als Assistent in drei Schritten (Menü: „Neuen Vorgang
 anlegen" → „Import-Assistenten öffnen"):
@@ -447,8 +521,8 @@ anlegen" → „Import-Assistenten öffnen"):
    dabei **noch nichts angelegt**
 3. **Zeilen abarbeiten** – jede Zeile erscheint als eigene, korrigierbare
    Karte mit allen relevanten Feldern (Name, Prozess-Auswahl, Datum, Fristen,
-   Notizen). Der/die Vorgesetzte wird je Zeile über die **AD-Suche**
-   bestätigt. Mit „Vorgang anlegen" wird die Zeile einzeln angelegt (der
+   Notizen). Der Vorgesetzte wird je Zeile über **Suchen** (Verzeichnis und
+   eigene Konten) bestätigt. Mit „Vorgang anlegen" wird die Zeile einzeln angelegt (der
    Vorgesetzte erhält sofort seine E-Mail), mit „Zeile verwerfen"
    übersprungen – bis alle Zeilen abgearbeitet sind. Der Fortschritt
    (angelegt/offen) wird oben angezeigt

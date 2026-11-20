@@ -34,8 +34,12 @@ class FieldController extends Controller
     public function update(Request $request, CustomField $field)
     {
         abort_unless(in_array($field->role_id, $this->manageableRoleIds(), true), 403, 'Felder dieser Rolle dürfen Sie nicht pflegen.');
+        $data = $this->validated($request);
+        // Auch das Ziel prüfen: ein Feld nicht in eine fremde Rolle verschieben
+        // Check the target too: do not move a field into a foreign role
+        abort_unless(in_array((int) $data['role_id'], $this->manageableRoleIds(), true), 403, 'Felder dieser Rolle dürfen Sie nicht pflegen.');
 
-        $field->update($this->validated($request));
+        $field->update($data);
 
         return back()->with('ok', __('Feld gespeichert.'));
     }
@@ -69,7 +73,7 @@ class FieldController extends Controller
         // Validate the regex before it is saved
         if (! empty($data['regex']) && @preg_match('~' . str_replace('~', '\~', $data['regex']) . '~u', '') === false) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'regex' => 'Der reguläre Ausdruck ist ungültig.',
+                'regex' => __('Der reguläre Ausdruck ist ungültig.'),
             ]);
         }
 

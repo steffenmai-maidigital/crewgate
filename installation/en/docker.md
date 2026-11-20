@@ -36,7 +36,9 @@ are stored there.
 
 ## 2. Start it for a trial
 
-Out of the box CrewGate runs in **demo mode**: without Active Directory, with
+CrewGate ships in normal operation (`DEMO_MODE: "false"`). To try it out, set
+`DEMO_MODE: "true"` in `docker-compose.yml`; CrewGate then runs in **demo
+mode**: without Active Directory, with
 sample data and fixed demo accounts. E-mails are not sent but written to the log.
 
 ```bash
@@ -96,9 +98,17 @@ If you tested in demo mode before and want to start with an empty database,
 set `FRESH_DB: "1"` for **one** start and change it straight back to
 `FRESH_DB: "0"` – otherwise the database is wiped on every start.
 
+Without `FRESH_DB` the demo data stays. The demo accounts then lose their
+password `demo` on the first start in normal operation: admin accounts (e.g.
+`max.admin`) get a new initial password, printed once in the container log
+(`docker compose logs app`), which must be changed at the first sign-in; all
+other demo accounts are locked.
+
 ### 3.3 Set it up in the web interface
 
-1. Log in with an account from the administrators group.
+1. Log in with an account from the administrators group. Coming with the
+   initial password from the container log, the first admin `admin` sets an
+   own password under **My account** first.
 2. Open **Settings** and fill in, in order:
    - **Company & appearance:** company name, logo, colours
    - **E-mail:** SMTP server, sender and the **portal link** – the public
@@ -109,7 +119,8 @@ set `FRESH_DB: "1"` for **one** start and change it straight back to
      take precedence over the Compose file)
    - **Retention & automatic deletion:** agree the period with data protection
 3. **Roles:** click "Read AD groups now", add the departments involved to the
-   workflow, set the order and a central e-mail address per department.
+   workflow, set the order, a central e-mail address and, if needed, the
+   English name per department.
 4. Create **fields** and **products** per department – or let the departments
    do it themselves.
 5. As an HR member, create a first case and walk through it once.

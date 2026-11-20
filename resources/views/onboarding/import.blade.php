@@ -22,14 +22,14 @@
             <h2 style="margin-top:0">{{ __('Schritt 1: Aktuelle Vorlage herunterladen') }}</h2>
             <p class="hint" style="margin-top:0">{{ __('Bitte verwenden Sie immer die frisch heruntergeladene Vorlage – sie enthält die aktuellen Spalten und Beispiele passend zu Ihren Prozessarten.') }}</p>
             <p><a class="primary small" style="text-decoration:none;padding:.45rem .9rem;border-radius:10px" href="{{ route('onboardings.import.template') }}">{{ __('Vorlage herunterladen (CSV)') }}</a></p>
-            <table class="manage">
+            <table class="manage cards">
                 <tr><th style="width:190px">{{ __('Spalte') }}</th><th>{{ __('Bedeutung / Format') }}</th><th style="width:80px">{{ __('Pflicht') }}</th></tr>
-                <tr><td><code>vorname</code> / <code>nachname</code></td><td>{{ __('Name des Mitarbeiters') }}</td><td>{{ __('ja') }}</td></tr>
-                <tr><td><code>prozess</code></td><td>{{ __('Schlüssel oder Name der Prozessart – verfügbar:') }} {{ $processes->map(fn($p) => $p->displayName() . ' (' . $p->key . ')')->implode(', ') }}. {{ __('Leer = Einstellung; in Schritt 3 änderbar.') }}</td><td>{{ __('nein') }}</td></tr>
-                <tr><td><code>eintrittsdatum</code></td><td>{{ __('TT.MM.JJJJ oder JJJJ-MM-TT (je nach Prozess: Eintritt, Wechsel, Austritt, Gültig ab)') }}</td><td>{{ __('nein') }}</td></tr>
-                <tr><td><code>vorgesetzter</code></td><td>{{ __('AD-Anmeldename; kann leer bleiben und wird in Schritt 3 über die AD-Suche gewählt') }}</td><td>{{ __('nein') }}</td></tr>
-                <tr><td><code>frist_vorgesetzter</code> / <code>frist_abteilungen</code></td><td>{{ __('Erledigungsdaten für die Erinnerungen (optional)') }}</td><td>{{ __('nein') }}</td></tr>
-                <tr><td><code>notizen</code></td><td>{{ __('Freitext für HR und Vorgesetzte') }}</td><td>{{ __('nein') }}</td></tr>
+                <tr><td data-label="{{ __('Spalte') }}"><code>vorname</code> / <code>nachname</code></td><td data-label="{{ __('Bedeutung / Format') }}">{{ __('Name des Mitarbeiters') }}</td><td data-label="{{ __('Pflicht') }}">{{ __('ja') }}</td></tr>
+                <tr><td data-label="{{ __('Spalte') }}"><code>prozess</code></td><td data-label="{{ __('Bedeutung / Format') }}">{{ __('Schlüssel oder Name der Prozessart – verfügbar:') }} {{ $processes->map(fn($p) => $p->displayName() . ' (' . $p->key . ')')->implode(', ') }}. {{ __('Leer = Einstellung; in Schritt 3 änderbar.') }}</td><td data-label="{{ __('Pflicht') }}">{{ __('nein') }}</td></tr>
+                <tr><td data-label="{{ __('Spalte') }}"><code>eintrittsdatum</code></td><td data-label="{{ __('Bedeutung / Format') }}">{{ __('TT.MM.JJJJ oder JJJJ-MM-TT (je nach Prozess: Eintritt, Wechsel, Austritt, Gültig ab)') }}</td><td data-label="{{ __('Pflicht') }}">{{ __('nein') }}</td></tr>
+                <tr><td data-label="{{ __('Spalte') }}"><code>vorgesetzter</code></td><td data-label="{{ __('Bedeutung / Format') }}">{{ __('Anmeldename; kann leer bleiben und wird in Schritt 3 über die Suche gewählt') }}</td><td data-label="{{ __('Pflicht') }}">{{ __('nein') }}</td></tr>
+                <tr><td data-label="{{ __('Spalte') }}"><code>frist_vorgesetzter</code> / <code>frist_abteilungen</code></td><td data-label="{{ __('Bedeutung / Format') }}">{{ __('Erledigungsdaten für die Erinnerungen (optional)') }}</td><td data-label="{{ __('Pflicht') }}">{{ __('nein') }}</td></tr>
+                <tr><td data-label="{{ __('Spalte') }}"><code>notizen</code></td><td data-label="{{ __('Bedeutung / Format') }}">{{ __('Freitext für HR und Vorgesetzte') }}</td><td data-label="{{ __('Pflicht') }}">{{ __('nein') }}</td></tr>
             </table>
             <p class="hint">{{ __('Trennzeichen ; oder , werden erkannt. Eine Zeile je Person. In Schritt 3 prüfen Sie jede Zeile, korrigieren bei Bedarf und legen die Vorgänge einzeln an – nichts wird ungeprüft angelegt.') }}</p>
         </div>
@@ -40,7 +40,7 @@
             <form method="post" action="{{ route('onboardings.import.upload') }}" enctype="multipart/form-data">
                 @csrf
                 <div class="row" style="align-items:end">
-                    <div><label>{{ __('CSV-Datei') }}</label><input type="file" name="csv" accept=".csv,text/csv" required></div>
+                    <div><label for="import-csv">{{ __('CSV-Datei') }}</label><input type="file" id="import-csv" name="csv" accept=".csv,text/csv" required></div>
                     <div style="max-width:220px"><button class="primary">{{ __('Einlesen & prüfen') }}</button></div>
                 </div>
             </form>
@@ -62,8 +62,8 @@
         {{-- ===== Schritt 3: Zeilen abarbeiten / Step 3: work through the rows ===== --}}
         <div class="panel" style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
             <strong>{{ __('Schritt 3: Zeilen prüfen und Vorgänge anlegen') }}</strong>
-            <span class="hint">{{ __('Je Zeile: Angaben korrigieren, Vorgesetzten über „Im AD suchen" bestätigen, dann „Vorgang anlegen".') }}</span>
-            <form method="post" action="{{ route('onboardings.import.reset') }}" style="margin-left:auto" onsubmit="return confirm('{{ __('Import abbrechen? Noch nicht angelegte Zeilen gehen verloren.') }}')">
+            <span class="hint">{{ __('Je Zeile: Angaben korrigieren, Vorgesetzten über „Suchen“ bestätigen, dann „Vorgang anlegen“.') }}</span>
+            <form method="post" action="{{ route('onboardings.import.reset') }}" style="margin-left:auto" onsubmit="return confirm(@js(__('Import abbrechen? Noch nicht angelegte Zeilen gehen verloren.')))">
                 @csrf<button class="primary small danger">{{ __('Import abbrechen') }}</button>
             </form>
         </div>
@@ -82,36 +82,36 @@
                     @csrf
                     <input type="hidden" name="row_key" value="{{ $key }}">
                     <div class="row">
-                        <div><label>{{ __('Vorname') }}</label><input type="text" name="first_name" value="{{ $row['first_name'] }}" required></div>
-                        <div><label>{{ __('Nachname') }}</label><input type="text" name="last_name" value="{{ $row['last_name'] }}" required></div>
+                        <div><label for="row-{{ $key }}-first">{{ __('Vorname') }}</label><input type="text" id="row-{{ $key }}-first" name="first_name" value="{{ $row['first_name'] }}" required></div>
+                        <div><label for="row-{{ $key }}-last">{{ __('Nachname') }}</label><input type="text" id="row-{{ $key }}-last" name="last_name" value="{{ $row['last_name'] }}" required></div>
                         <div style="max-width:240px">
-                            <label>{{ __('Prozess') }}</label>
-                            <select name="process" required>
+                            <label for="row-{{ $key }}-process">{{ __('Prozess') }}</label>
+                            <select id="row-{{ $key }}-process" name="process" required>
                                 @if(!$row['process'])<option value="" selected disabled>{{ __('bitte wählen') }}</option>@endif
                                 @foreach($processes as $p)
                                     <option value="{{ $p->key }}" @selected($row['process'] === $p->key)>{{ $p->displayName() }}</option>
                                 @endforeach
                             </select>
                         </div>
-                        <div><label>{{ __('Datum') }}</label><input type="date" name="start_date" value="{{ $row['start_date'] }}"></div>
+                        <div><label for="row-{{ $key }}-date">{{ __('Datum') }}</label><input type="date" id="row-{{ $key }}-date" name="start_date" value="{{ $row['start_date'] }}"></div>
                     </div>
                     <div class="row" style="align-items:end">
                         <div>
-                            <label>{{ __('Vorgesetzter (AD-Benutzername oder Name)') }}</label>
-                            <input type="text" name="supervisor_username" class="js-supervisor" value="{{ $row['supervisor_username'] }}" required>
+                            <label for="row-{{ $key }}-supervisor">{{ __('Vorgesetzter (Benutzername oder Name)') }}</label>
+                            <input type="text" id="row-{{ $key }}-supervisor" name="supervisor_username" class="js-supervisor" value="{{ $row['supervisor_username'] }}" required>
                         </div>
-                        <div style="flex:0"><button type="button" class="primary small js-lookup" style="margin-top:0">{{ __('Im AD suchen') }}</button></div>
+                        <div style="flex:0"><button type="button" class="primary small js-lookup" style="margin-top:0">{{ __('Suchen') }}</button></div>
                     </div>
-                    <p class="hint js-lookup-result" style="min-height:1.1em"></p>
+                    <p class="hint js-lookup-result" style="min-height:1.1em" aria-live="polite"></p>
                     <div class="row">
-                        <div><label>{{ __('Erledigen bis: Vorgesetzter (optional)') }}</label><input type="date" name="supervisor_due_date" value="{{ $row['supervisor_due_date'] }}"></div>
-                        <div><label>{{ __('Erledigen bis: Abteilungen (optional)') }}</label><input type="date" name="roles_due_date" value="{{ $row['roles_due_date'] }}"></div>
-                        <div><label>{{ __('Notizen (optional)') }}</label><input type="text" name="notes" value="{{ $row['notes'] }}"></div>
+                        <div><label for="row-{{ $key }}-due-supervisor">{{ __('Erledigen bis: Vorgesetzter (optional)') }}</label><input type="date" id="row-{{ $key }}-due-supervisor" name="supervisor_due_date" value="{{ $row['supervisor_due_date'] }}"></div>
+                        <div><label for="row-{{ $key }}-due-roles">{{ __('Erledigen bis: Abteilungen (optional)') }}</label><input type="date" id="row-{{ $key }}-due-roles" name="roles_due_date" value="{{ $row['roles_due_date'] }}"></div>
+                        <div><label for="row-{{ $key }}-notes">{{ __('Notizen (optional)') }}</label><input type="text" id="row-{{ $key }}-notes" name="notes" value="{{ $row['notes'] }}"></div>
                     </div>
                 </form>
                 <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.2rem">
                     <button class="primary" form="row-form-{{ $key }}">{{ __('Vorgang anlegen') }}</button>
-                    <form method="post" action="{{ route('onboardings.import.discard') }}" class="inline-form" onsubmit="return confirm('{{ __('Diese Zeile verwerfen?') }}')">
+                    <form method="post" action="{{ route('onboardings.import.discard') }}" class="inline-form" onsubmit="return confirm(@js(__('Diese Zeile verwerfen?')))">
                         @csrf
                         <input type="hidden" name="row_key" value="{{ $key }}">
                         <button class="primary small danger">{{ __('Zeile verwerfen') }}</button>
@@ -121,24 +121,33 @@
         @endforeach
 
         <script>
-            // AD-Suche je Zeile (gleicher Endpunkt wie bei der Einzelanlage)
-            // AD search per row (same endpoint as for creating a single case)
+            // Suche je Zeile im Verzeichnis und in den eigenen Konten (gleicher Endpunkt wie bei der Einzelanlage)
+            // Search per row in the directory and the own accounts (same endpoint as for creating a single case)
+            const lookupText = @js([
+                'short' => __('Bitte mindestens 2 Zeichen eingeben.'),
+                'busy' => __('Suche …'),
+                'failed' => __('Fehler bei der Suche.'),
+                'found' => __('Gefunden:'),
+                'department' => __('Abteilung:'),
+                'none' => __('nicht gepflegt'),
+                'offline' => __('Die Suche ist gerade nicht erreichbar.'),
+            ]);
             document.querySelectorAll('.js-lookup').forEach(function (btn) {
                 btn.addEventListener('click', async function () {
                     const form = btn.closest('form');
                     const input = form.querySelector('.js-supervisor');
                     const out = form.parentElement.querySelector('.js-lookup-result');
                     const q = input.value.trim();
-                    if (q.length < 2) { out.textContent = '{{ __('Bitte mindestens 2 Zeichen eingeben.') }}'; return; }
-                    out.textContent = '{{ __('Suche im AD …') }}';
+                    if (q.length < 2) { out.textContent = lookupText.short; return; }
+                    out.textContent = lookupText.busy;
                     try {
-                        const res = await fetch('{{ route('ad.supervisor') }}?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+                        const res = await fetch(@js(route('ad.supervisor')) + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
                         const data = await res.json();
-                        if (!res.ok) { out.textContent = data.error || '{{ __('Fehler bei der AD-Suche.') }}'; return; }
-                        out.textContent = '{{ __('Gefunden:') }} ' + (data.name || data.username) + ' – {{ __('Abteilung:') }} ' + (data.department || '{{ __('nicht gepflegt') }}');
+                        if (!res.ok) { out.textContent = data.error || lookupText.failed; return; }
+                        out.textContent = lookupText.found + ' ' + (data.name || data.username) + ' – ' + lookupText.department + ' ' + (data.department || lookupText.none);
                         if (data.username) input.value = data.username;
                     } catch (e) {
-                        out.textContent = '{{ __('AD-Suche nicht erreichbar.') }}';
+                        out.textContent = lookupText.offline;
                     }
                 });
             });

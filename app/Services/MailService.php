@@ -167,7 +167,8 @@ class MailService
         $currentRole = null;
 
         foreach ($values as $v) {
-            $roleName = $v->field->role?->name ?? 'Allgemein';
+            // Rollen zweisprachig wie die Feldbezeichnungen / roles bilingual like the field labels
+            $roleName = $v->field->role?->bilingualName() ?? 'Allgemein';
             if ($roleName !== $currentRole) {
                 $lines[] = ($currentRole !== null ? "\n" : '') . $roleName . ':';
                 $currentRole = $roleName;
@@ -190,7 +191,7 @@ class MailService
             return;
         }
 
-        $subject = $onboarding->processLabel() . ': ' . $onboarding->fullName() . ' – Aufgabe für / Task for ' . $role->name;
+        $subject = $onboarding->processLabel() . ': ' . $onboarding->fullName() . ' – ' . static::taskFor($role);
 
         $vars = [
             'name'      => $onboarding->fullName(),
@@ -204,17 +205,29 @@ class MailService
         ];
 
         // Vorlagen aus den Einstellungen (leer = Standardtext);
-        // erst deutscher, dann englischer Text
+        // erst deutscher, dann englischer Text (mit dem englischen Rollennamen)
         // Templates from the settings (empty = default text);
-        // German text first, then English
+        // German text first, then English (with the English role name)
         $de = Setting::get('mail_tpl_role_de') ?: static::ROLE_TEMPLATE_DE;
         $en = Setting::get('mail_tpl_role_en') ?: static::ROLE_TEMPLATE_EN;
 
         $body = static::render($de, $vars)
             . "\n\n----------------------------------------\n\n"
-            . static::render($en, $vars);
+            . static::render($en, ['role' => $role->englishName()] + $vars);
 
         static::sendText($role->central_email, $subject, $body, $onboarding);
+    }
+
+    /**
+     * Betreffzeile „Aufgabe für … / Task for …“ mit dem Rollennamen je Sprache
+     *
+     * Subject part "Aufgabe für … / Task for …" with the role name per language
+     */
+    public static function taskFor(Role $role): string
+    {
+        return $role->englishName() === $role->name
+            ? 'Aufgabe für / Task for ' . $role->name
+            : 'Aufgabe für ' . $role->name . ' / Task for ' . $role->englishName();
     }
 
     /** Vorlage aus den Einstellungen oder Standard / Template from the settings or default */

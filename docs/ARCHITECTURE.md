@@ -79,7 +79,8 @@ Der Demo-Modus (`DEMO_MODE=true`) ersetzt das AD durch die interne Klasse
 |---|---|
 | onboardings | Vorgang: Person, Prozess-Key, Status, Vorgesetzter (+E-Mail), Abteilung, Fristen (`supervisor_due_date`, `roles_due_date`) + Erinnerungs-Merker, `completed_at` |
 | processes | Prozessarten: key, Name (DE/EN), beteiligte `role_ids` (leer = alle), aktiv, `is_system` |
-| roles | Abteilungen: AD-Gruppen-DN, zentrale E-Mail, Reihenfolge, `in_workflow`, `is_intake` (HR-Anlage), `visible_role_ids` (Daten-Freigaben) |
+| roles | Abteilungen: Name (DE/EN, `name_en` optional), Gruppen-DN im Verzeichnis, zentrale E-Mail, Reihenfolge, `in_workflow`, `is_intake` (HR-Anlage), `visible_role_ids` (Daten-Freigaben) |
+| users | eigene Konten und Verzeichniskonten: Herkunft (`auth_source`), bcrypt-Passwort (nur eigene Konten), `must_change_password` (Startpasswort), Rechte, Zwei-Faktor (verschlüsselt), `guid` (Verzeichnis-Kennung) |
 | custom_fields | Feldkonfiguration: Rolle, Typ (select/multiselect/checkbox/date/product/text+Regex), Pflicht, DE/EN-Bezeichnung, `processes` (Zuordnung), `fill_stage` (Anlage/Vorbereitung), `visible_to_all` |
 | onboarding_values | erfasste Werte je Vorgang+Feld (`filled_by`) |
 | onboarding_steps | Quittierungen je Vorgang+Rolle (`completed_by/at`) |

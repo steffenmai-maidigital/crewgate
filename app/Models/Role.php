@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Role extends Model
 {
     protected $fillable = [
-        'name', 'ad_group_dn', 'central_email', 'sort_order', 'in_workflow', 'is_intake', 'visible_role_ids',
+        'name', 'name_en', 'ad_group_dn', 'central_email', 'sort_order', 'in_workflow', 'is_intake', 'visible_role_ids',
     ];
 
     protected $casts = [
@@ -16,6 +16,34 @@ class Role extends Model
         'is_intake'   => 'boolean',
         'visible_role_ids' => 'array',
     ];
+
+    /**
+     * Name in der Sprache der Oberfläche (englisch nur, wenn gepflegt)
+     *
+     * Name in the interface language (English only if maintained)
+     */
+    public function displayName(): string
+    {
+        return app()->getLocale() === 'en' ? $this->englishName() : (string) $this->name;
+    }
+
+    /** Englischer Name mit Rückfall auf den deutschen / English name falling back to the German one */
+    public function englishName(): string
+    {
+        return filled($this->name_en) ? (string) $this->name_en : (string) $this->name;
+    }
+
+    /**
+     * Zweisprachig für Exporte und E-Mails: "Deutsch / English"
+     *
+     * Bilingual for exports and e-mails: "Deutsch / English"
+     */
+    public function bilingualName(): string
+    {
+        return filled($this->name_en) && $this->name_en !== $this->name
+            ? $this->name . ' / ' . $this->name_en
+            : (string) $this->name;
+    }
 
     public function fields(): HasMany
     {

@@ -8,6 +8,12 @@
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # Hochgeladene Dateien (Logo, Produktbilder): nur Bilder ausliefern
+    # Uploaded files (logo, product images): deliver images only
+    RewriteCond %{REQUEST_URI} ^/uploads/ [NC]
+    RewriteCond %{REQUEST_URI} !\.(png|jpe?g|webp|svg|gif)$ [NC]
+    RewriteRule ^ - [F,L]
+
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
@@ -15,4 +21,16 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+# Hochgeladene Bilder nie als Seite mit Skripten ausführen (auch kein SVG, das
+# man direkt aufruft): eigene Content-Security-Policy mit Sandbox, kein Raten
+# des Inhaltstyps
+# Never run uploaded images as a page with scripts (not even an SVG opened
+# directly): own content security policy with sandbox, no content type sniffing
+<IfModule mod_headers.c>
+    <If "%{REQUEST_URI} =~ m#^/uploads/#">
+        Header always set Content-Security-Policy "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+        Header always set X-Content-Type-Options "nosniff"
+    </If>
 </IfModule>

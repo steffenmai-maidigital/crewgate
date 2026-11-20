@@ -36,7 +36,9 @@ landen die nächtlichen Sicherungen.
 
 ## 2. Zum Ausprobieren starten
 
-Im Auslieferungszustand läuft CrewGate im **Demo-Modus**: ohne Active Directory,
+Ausgeliefert wird CrewGate im Normalbetrieb (`DEMO_MODE: "false"`). Zum
+Ausprobieren in der `docker-compose.yml` `DEMO_MODE: "true"` setzen; dann
+läuft CrewGate im **Demo-Modus**: ohne Active Directory,
 mit Beispieldaten und festen Demo-Konten. E-Mails werden nicht verschickt, sondern ins Protokoll geschrieben.
 
 ```bash
@@ -96,9 +98,17 @@ Wer vorher im Demo-Modus getestet hat und mit einer leeren Datenbank beginnen
 möchte, setzt für **einen** Start `FRESH_DB: "1"` und danach sofort wieder
 `FRESH_DB: "0"` – sonst wird die Datenbank bei jedem Start gelöscht.
 
+Ohne `FRESH_DB` bleiben die Demodaten erhalten. Die Demo-Konten verlieren
+dann beim ersten Start im Normalbetrieb ihr Passwort `demo`: Admin-Konten
+(z. B. `max.admin`) bekommen ein neues Startpasswort, das einmal im
+Container-Protokoll steht (`docker compose logs app`) und bei der ersten
+Anmeldung geändert werden muss; alle anderen Demo-Konten werden gesperrt.
+
 ### 3.3 In der Oberfläche einrichten
 
-1. Mit einem Konto aus der Administratoren-Gruppe anmelden.
+1. Mit einem Konto aus der Administratoren-Gruppe anmelden. Der erste Admin
+   `admin` vergibt zuerst unter **Mein Konto** ein eigenes Passwort, wenn er
+   mit dem Startpasswort aus dem Container-Protokoll kommt.
 2. **Einstellungen** öffnen und der Reihe nach ausfüllen:
    - **Firma & Erscheinungsbild:** Firmenname, Logo, Farben
    - **E-Mail-Versand:** SMTP-Server, Absender und den **Portal-Link** – die
@@ -109,8 +119,8 @@ möchte, setzt für **einen** Start `FRESH_DB: "1"` und danach sofort wieder
      Auditoren (die Werte hier haben Vorrang vor der Compose-Datei)
    - **Aufbewahrung & automatische Löschung:** Frist mit dem Datenschutz abstimmen
 3. **Rollen:** „AD-Gruppen jetzt einlesen“ klicken, die beteiligten
-   Abteilungen in den Workflow aufnehmen, Reihenfolge und zentrale
-   E-Mail-Adresse je Abteilung eintragen.
+   Abteilungen in den Workflow aufnehmen, Reihenfolge, zentrale
+   E-Mail-Adresse und bei Bedarf den englischen Namen je Abteilung eintragen.
 4. **Felder** und **Produkte** je Abteilung anlegen – oder die Abteilungen das
    selbst erledigen lassen.
 5. Als Mitglied der Personalabteilung einen ersten Vorgang anlegen und einmal

@@ -18,7 +18,7 @@ Der Ablauf in vier Schritten:
 
 1. **HR legt den Vorgang an** (Name, Eintritt, Vorgesetzter) → Status
    *in Vorbereitung*.
-2. **Der/die Vorgesetzte pflegt die Angaben** für alle beteiligten Abteilungen
+2. **Der Vorgesetzte pflegt die Angaben** für alle beteiligten Abteilungen
    und sendet den Vorgang ab.
 3. **Alle Fachabteilungen** werden gleichzeitig per E-Mail informiert und
    **quittieren jeweils den Erhalt** ihrer Informationen.
@@ -29,9 +29,21 @@ Der Ablauf in vier Schritten:
 
 ## 2. Anmelden
 
-Die Anmeldung erfolgt mit dem **Windows-Konto** (Active Directory) – also mit
-demselben Benutzernamen und Passwort wie am Arbeitsplatzrechner. Welche Rechte
-Sie im Portal haben, ergibt sich automatisch aus Ihren AD-Gruppen.
+Die Anmeldung erfolgt mit einem **CrewGate-Konto** (Benutzername und Passwort
+vom Administrator) oder, wenn eingerichtet, mit dem **Firmenkonto** aus dem
+Verzeichnis – also mit demselben Benutzernamen und Passwort wie am
+Arbeitsplatzrechner. Die Rechte vergibt der Administrator bzw. ergeben sich aus
+Ihren Gruppen im Verzeichnis.
+
+**Startpasswort:** Haben Sie Ihr Passwort vom Administrator bekommen (neues
+Konto oder zurückgesetzt), öffnet sich nach der Anmeldung zuerst **Mein
+Konto**. Vergeben Sie dort unter **Passwort ändern** ein eigenes; vorher
+erreichen Sie keine andere Seite.
+
+**Passwort ändern:** unter **Mein Konto** (Ihr Name oben rechts). Danach sind
+Ihre anderen Anmeldungen mit diesem Konto beendet, etwa auf einem zweiten
+Rechner; die aktuelle bleibt. Das Passwort eines Firmenkontos ändern Sie im
+Verzeichnis, nicht hier.
 
 > **Demo-Modus:** Läuft die Anwendung als Demo, sind auf der Anmeldeseite
 > Testkonten aufgelistet (Passwort jeweils `demo`). Es ist keine AD-Verbindung
@@ -72,14 +84,15 @@ Der Status eines Vorgangs wird immer als farbige Plakette angezeigt:
 
 ## 4. Für die Personalabteilung (HR)
 
-### 4.1 Neuen Mitarbeiter anlegen
+### 4.1 Neuen Vorgang anlegen
 
-1. Menüpunkt **Neuer Mitarbeiter**.
+1. Menüpunkt **Neuer Vorgang**.
 2. Vorname, Nachname und Eintrittsdatum eintragen.
 3. **Vorgesetzter**: Benutzernamen oder Namen eingeben und auf
-   **Im AD suchen** klicken. Das Portal liest Namen und **Abteilung** direkt
-   aus dem Active Directory – die Abteilung bestimmt, wo der neue Mitarbeiter
-   arbeiten wird.
+   **Suchen** klicken. Das Portal liest Namen und **Abteilung** aus dem
+   Verzeichnis (z. B. Active Directory) oder aus dem CrewGate-Konto des
+   Vorgesetzten – die Abteilung bestimmt, wo der Mitarbeiter arbeiten wird.
+   Nur der hier eingetragene Vorgesetzte pflegt später die Vorbereitung.
 4. Die zusätzlichen **Anlage-Felder** ausfüllen (z. B. Stellenbezeichnung,
    Beschäftigungsart, Personalnummer). Welche Felder das sind, legt die
    Administration fest.
@@ -126,7 +139,7 @@ Beide Aktionen fragen vorher noch einmal nach.
 Sobald HR einen Vorgang für Ihren neuen Mitarbeiter angelegt hat, erhalten Sie
 eine E-Mail mit einer kurzen Beschreibung und dem Link zum Portal. Melden Sie
 sich dort mit Ihrem Windows-Konto an – der Vorgang erscheint in der Übersicht
-unter **Neue Mitarbeiter in deiner Abteilung**.
+unter **Vorgänge in Ihrer Abteilung**.
 
 ### 5.2 Angaben pflegen
 
@@ -152,7 +165,7 @@ betroffenen Feldern – der Vorgang wird dann **nicht** abgesendet.
 
 ### 5.3 Danach
 
-Im Bereich **Neue Mitarbeiter in deiner Abteilung** verfolgen Sie den Stand:
+Im Bereich **Vorgänge in Ihrer Abteilung** verfolgen Sie den Stand:
 Die Spalte *Ausstehende Quittierungen* zeigt, welche Abteilung noch nicht
 bestätigt hat.
 
@@ -170,8 +183,8 @@ darunter der englische Text.
 
 ### 6.2 Erhalt quittieren
 
-Auf der Startseite erscheint der Vorgang unter **Aufgaben für deine
-Abteilung**. Die Spalte **Eure Daten** zeigt:
+Auf der Startseite erscheint der Vorgang unter **Aufgaben für Ihre
+Abteilung**. Die Spalte **Ihre Daten** zeigt:
 
 - **ausgefüllt** – alle Pflichtangaben für Ihre Abteilung liegen vor
 - **unvollständig** – es fehlt noch etwas
@@ -227,6 +240,12 @@ Fachabteilungen sehen nur ihre eigenen Felder plus die Daten, die für ihre
 Rolle ausdrücklich freigegeben wurden. HR, Vorgesetzte, Administratoren und
 Auditoren sehen alles.
 
+**Beim Öffnen eines Vorgangs erscheint „Fehler 403“.**
+Der Vorgang gehört nicht zu Ihrer Abteilung. Vorgänge öffnen HR,
+Administratoren, Auditoren und die Abteilungen im Workflow; der Vorgesetzte die
+Vorgänge, für die er eingetragen ist, jeder die selbst angelegten. Kollegen
+derselben Abteilung sehen nur die Kopfdaten (Name, Prozess, Datum, Stand).
+
 **Ich kann nicht quittieren – der Button fehlt.**
 Entweder ist Ihre Abteilung nicht mehr offen (bereits quittiert), oder die
 Pflichtdaten fehlen noch (dann steht *unvollständig* – öffnen Sie den Vorgang
@@ -241,6 +260,15 @@ erneut ab. Zwischenspeichern funktioniert auch mit Lücken.
 Aus Datenschutzgründen enthalten alle E-Mails nur den allgemeinen Portal-Link.
 Melden Sie sich an – Sie finden den Vorgang in Ihrer Übersicht.
 
+**Ich wurde abgemeldet: „Das Passwort dieses Kontos wurde geändert“.**
+Ihr Passwort wurde auf einem anderen Gerät oder vom Administrator geändert.
+Melden Sie sich mit dem neuen Passwort an. Kennen Sie es nicht, hilft der
+Administrator.
+
+**Die Abteilungen heißen auf Englisch anders.**
+Der Administrator kann je Abteilung einen englischen Namen pflegen; die
+englische Oberfläche zeigt dann diesen.
+
 **Wie lange bleiben Vorgänge gespeichert?**
 Abgeschlossene Vorgänge werden nach Ablauf der eingestellten Aufbewahrungsfrist
 automatisch und protokolliert gelöscht. Die Frist legt die Administration fest.
@@ -248,11 +276,11 @@ automatisch und protokolliert gelöscht. Die Frist legt die Administration fest.
 
 ## Für HR: Mehrere Mitarbeiter auf einmal anlegen (CSV-Assistent)
 
-Auf „Neuen Vorgang anlegen" öffnen Sie unten den **Import-Assistenten**. Er
+Auf der Seite **Neuen Vorgang anlegen** öffnen Sie unten den **Import-Assistenten**. Er
 führt in drei Schritten durch den Import: (1) aktuelle Vorlage herunterladen
 (mit Anleitung zu allen Spalten direkt auf der Seite), (2) ausgefüllte CSV
 hochladen, (3) jede Zeile prüfen – alle Felder sind dort noch korrigierbar,
-der Vorgesetzte wird bequem über die AD-Suche gewählt – und den Vorgang
+der Vorgesetzte wird über **Suchen** gewählt – und den Vorgang
 per Klick anlegen. So arbeiten Sie Zeile für Zeile ab, bis alles angelegt
 ist; nichts wird ungeprüft übernommen. Jeder Vorgang startet wie gewohnt in
 der Vorbereitung, die Vorgesetzten erhalten sofort ihre E-Mail.

@@ -8,16 +8,17 @@
     @foreach($R::TYPES as $type)
         @php($typeChoice = old($type . '_type', \App\Models\Setting::get($type . '_type', 'text')))
         <fieldset class="legal" data-type="{{ $type }}">
-            <legend>{{ $type === 'imprint' ? '⚖️' : '🔒' }} {{ $R::title($type) }}
+            <legend id="{{ $type }}-legend">{{ $type === 'imprint' ? '⚖️' : '🔒' }} {{ $R::title($type) }}
                 @if($R::enabled($type)) · <a href="{{ $R::url($type) }}" target="_blank" rel="noopener">{{ __('Ansehen') }}</a>@endif</legend>
             <label class="check"><input type="checkbox" name="{{ $type }}_enabled" value="1" @checked(old('_token') !== null ? old($type . '_enabled') : \App\Models\Setting::get($type . '_enabled', '0') === '1')>
                 <strong>{{ __(':seite anzeigen', ['seite' => $R::title($type)]) }}</strong></label>
             <div class="legal-choice">
-                <label class="check"><input type="radio" name="{{ $type }}_type" value="text" @checked($typeChoice !== 'link')> {{ __('Text hier eingeben') }}</label>
+                <label class="check" id="{{ $type }}-text-choice"><input type="radio" name="{{ $type }}_type" value="text" @checked($typeChoice !== 'link')> {{ __('Text hier eingeben') }}</label>
                 <label class="check"><input type="radio" name="{{ $type }}_type" value="link" @checked($typeChoice === 'link')> {{ __('Auf eine vorhandene Seite verlinken (z. B. Firmen-Homepage)') }}</label>
             </div>
             <div class="legal-text">
-                <textarea name="{{ $type }}_text" id="{{ $type }}_text" rows="10" maxlength="{{ $R::MAX }}"
+                {{-- Name aus Überschrift und Wahl „Text hier eingeben“ / name from the legend and the choice "enter text here" --}}
+                <textarea name="{{ $type }}_text" id="{{ $type }}_text" rows="10" maxlength="{{ $R::MAX }}" aria-labelledby="{{ $type }}-legend {{ $type }}-text-choice"
                           placeholder="{{ $type === 'imprint' ? __('Name und Anschrift der Firma, vertreten durch …, Telefon, E-Mail, Registereintrag …') : __('Wer verantwortlich ist, welche Daten verarbeitet werden, wo sie liegen, wie lange, Rechte der Betroffenen …') }}">{{ old($type . '_text', $R::text($type)) }}</textarea>
                 <p class="hint">{{ __('Einfacher Text: Leerzeile = neuer Absatz, eine Zeile mit „# “ davor = Überschrift. Internet- und E-Mail-Adressen werden automatisch zu Links.') }}</p>
                 @if($type === 'privacy')

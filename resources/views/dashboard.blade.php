@@ -24,25 +24,32 @@
         @include('partials.workflow-flow', ['roles' => $workflow, 'big' => true])
     </div>
 
+    @if($myTasks->isEmpty() && $departmentOnboardings->isEmpty() && $participating->isEmpty() && ! ($user['is_hr'] ?? false))
+        <div class="panel">
+            <p style="margin:0">{{ __('Zurzeit wartet keine Aufgabe auf Sie.') }}</p>
+            <p class="hint" style="margin-bottom:0">{{ __('Sobald ein Vorgang Ihre Abteilung betrifft, erscheint er hier. Mehr dazu unter „Hilfe“ im Footer.') }}</p>
+        </div>
+    @endif
+
     @if($myTasks->isNotEmpty())
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Aufgaben für Ihre Abteilung') }}</h2>
-            <table>
-                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Eintritt') }}</th><th>{{ __('Abteilung') }}</th><th>{{ __('Eure Daten') }}</th><th></th></tr>
+            <table class="cards">
+                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Eintritt') }}</th><th>{{ __('Abteilung') }}</th><th>{{ __('Ihre Daten') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
                 @foreach($myTasks as $o)
                     @foreach($o->my_pending as $p)
                         <tr>
-                            <td>{{ $o->fullName() }} <span class="badge process">{{ $o->processLabel() }}</span></td>
-                            <td>{{ $o->start_date?->format('d.m.Y') ?? '–' }}</td>
-                            <td>{{ $o->department ?? '–' }}</td>
-                            <td>
+                            <td data-label="{{ __('Mitarbeiter') }}"><a href="{{ route('onboardings.show', $o) }}">{{ $o->fullName() }}</a> <span class="badge process">{{ $o->processLabel() }}</span></td>
+                            <td data-label="{{ __('Eintritt') }}">{{ $o->start_date?->format('d.m.Y') ?? '–' }}</td>
+                            <td data-label="{{ __('Abteilung') }}">{{ $o->department ?? '–' }}</td>
+                            <td data-label="{{ __('Ihre Daten') }}">
                                 @if($p['data_ready'])
                                     <span class="badge done">{{ __('ausgefüllt') }}</span>
                                 @else
                                     <span class="badge open">{{ __('unvollständig') }}</span>
                                 @endif
                             </td>
-                            <td style="white-space:nowrap">
+                            <td class="actions" style="white-space:nowrap">
                                 <a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a>
                                 @if($p['data_ready'])
                                     <form method="post" action="{{ route('onboardings.acknowledge', [$o, $p['role']]) }}" class="inline-form" style="margin-left:.6rem">
@@ -61,22 +68,22 @@
 
     @if($departmentOnboardings->isNotEmpty())
         <div class="panel">
-            <h2 style="margin-top:0">{{ __('Neue Mitarbeiter in deiner Abteilung') }} ({{ $user['department'] }})</h2>
-            <table>
-                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Eintritt') }}</th><th>{{ __('Status') }}</th><th>{{ __('Ausstehende Quittierungen') }}</th><th></th></tr>
+            <h2 style="margin-top:0">{{ __('Vorgänge in Ihrer Abteilung') }} ({{ $user['department'] }})</h2>
+            <table class="cards">
+                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Eintritt') }}</th><th>{{ __('Status') }}</th><th>{{ __('Ausstehende Quittierungen') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
                 @foreach($departmentOnboardings as $o)
                     <tr>
-                        <td>{{ $o->fullName() }} <span class="badge process">{{ $o->processLabel() }}</span></td>
-                        <td>{{ $o->start_date?->format('d.m.Y') ?? '–' }}</td>
-                        <td><span class="badge {{ $o->statusBadge() }}">{{ $o->statusLabel() }}</span></td>
-                        <td>
+                        <td data-label="{{ __('Mitarbeiter') }}"><a href="{{ route('onboardings.show', $o) }}">{{ $o->fullName() }}</a> <span class="badge process">{{ $o->processLabel() }}</span></td>
+                        <td data-label="{{ __('Eintritt') }}">{{ $o->start_date?->format('d.m.Y') ?? '–' }}</td>
+                        <td data-label="{{ __('Status') }}"><span class="badge {{ $o->statusBadge() }}">{{ $o->statusLabel() }}</span></td>
+                        <td data-label="{{ __('Ausstehende Quittierungen') }}">
                             @if($o->status === 'open')
-                                @foreach($o->pendingRoles() as $pr)<span class="badge open">{{ $pr->name }}</span> @endforeach
+                                @foreach($o->pendingRoles() as $pr)<span class="badge open">{{ $pr->displayName() }}</span> @endforeach
                             @else
                                 –
                             @endif
                         </td>
-                        <td><a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a></td>
+                        <td class="actions"><a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a></td>
                     </tr>
                 @endforeach
             </table>
@@ -85,53 +92,53 @@
 
     @if($participating->isNotEmpty())
         <div class="panel">
-            <h2 style="margin-top:0">{{ __('Vorgänge (Beteiligung deiner Abteilung)') }}</h2>
-            <table>
-                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Status') }}</th><th>{{ __('Ausstehende Quittierungen') }}</th><th></th></tr>
+            <h2 style="margin-top:0">{{ __('Vorgänge (Beteiligung Ihrer Abteilung)') }}</h2>
+            <table class="cards">
+                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Status') }}</th><th>{{ __('Ausstehende Quittierungen') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
                 @foreach($participating as $o)
                     <tr>
-                        <td>{{ $o->fullName() }} <span class="badge process">{{ $o->processLabel() }}</span></td>
-                        <td><span class="badge {{ $o->statusBadge() }}">{{ $o->statusLabel() }}</span></td>
-                        <td>
+                        <td data-label="{{ __('Mitarbeiter') }}"><a href="{{ route('onboardings.show', $o) }}">{{ $o->fullName() }}</a> <span class="badge process">{{ $o->processLabel() }}</span></td>
+                        <td data-label="{{ __('Status') }}"><span class="badge {{ $o->statusBadge() }}">{{ $o->statusLabel() }}</span></td>
+                        <td data-label="{{ __('Ausstehende Quittierungen') }}">
                             @if($o->status === 'open')
-                                @foreach($o->pendingRoles() as $pr)<span class="badge open">{{ $pr->name }}</span> @endforeach
+                                @foreach($o->pendingRoles() as $pr)<span class="badge open">{{ $pr->displayName() }}</span> @endforeach
                             @else
                                 –
                             @endif
                         </td>
-                        <td><a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a></td>
+                        <td class="actions"><a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a></td>
                     </tr>
                 @endforeach
             </table>
-            <p class="hint">{{ __('Du siehst darin die Felder deiner Abteilung sowie die im Backend zusätzlich freigegebenen Daten.') }}</p>
+            <p class="hint">{{ __('Sie sehen darin die Felder Ihrer Abteilung sowie die zusätzlich freigegebenen Daten anderer Abteilungen.') }}</p>
         </div>
     @endif
 
     @if(($user['is_hr'] ?? false))
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Offene Vorgänge (HR)') }}</h2>
-            <table>
-                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Abteilung') }}</th><th>{{ __('Vorgesetzter') }}</th><th>{{ __('Status') }}</th><th>{{ __('Ausstehende Quittierungen') }}</th><th>{{ __('Angelegt') }}</th><th></th></tr>
+            <table class="cards">
+                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Abteilung') }}</th><th>{{ __('Vorgesetzter') }}</th><th>{{ __('Status') }}</th><th>{{ __('Ausstehende Quittierungen') }}</th><th>{{ __('Angelegt') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
                 @forelse($openCases as $o)
                     <tr>
-                        <td>{{ $o->fullName() }} <span class="badge process">{{ $o->processLabel() }}</span></td>
-                        <td>{{ $o->department ?? '–' }}</td>
-                        <td>{{ $o->supervisor_name ?? $o->supervisor_username }}</td>
-                        <td><span class="badge {{ $o->statusBadge() }}">{{ $o->statusLabel() }}</span></td>
-                        <td>
+                        <td data-label="{{ __('Mitarbeiter') }}"><a href="{{ route('onboardings.show', $o) }}">{{ $o->fullName() }}</a> <span class="badge process">{{ $o->processLabel() }}</span></td>
+                        <td data-label="{{ __('Abteilung') }}">{{ $o->department ?? '–' }}</td>
+                        <td data-label="{{ __('Vorgesetzter') }}">{{ $o->supervisor_name ?? $o->supervisor_username }}</td>
+                        <td data-label="{{ __('Status') }}"><span class="badge {{ $o->statusBadge() }}">{{ $o->statusLabel() }}</span></td>
+                        <td data-label="{{ __('Ausstehende Quittierungen') }}">
                             @if($o->status === 'open')
-                                @forelse($o->pendingRoles() as $pr)<span class="badge open">{{ $pr->name }}</span> @empty – @endforelse
+                                @forelse($o->pendingRoles() as $pr)<span class="badge open">{{ $pr->displayName() }}</span> @empty – @endforelse
                             @elseif($o->status === 'review')
                                 <span class="badge done">{{ __('alle quittiert') }}</span>
                             @else
                                 –
                             @endif
                         </td>
-                        <td>{{ $o->created_at->format('d.m.Y') }}</td>
-                        <td style="white-space:nowrap">
+                        <td data-label="{{ __('Angelegt') }}">{{ $o->created_at->format('d.m.Y') }}</td>
+                        <td class="actions" style="white-space:nowrap">
                             <a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a>
                             @if($o->status === 'review')
-                                <form method="post" action="{{ route('onboardings.close', $o) }}" class="inline-form" style="margin-left:.6rem" onsubmit="return confirm('{{ __('Vorgang abschließen? Danach beginnt die Aufbewahrungsfrist.') }}')">
+                                <form method="post" action="{{ route('onboardings.close', $o) }}" class="inline-form" style="margin-left:.6rem" onsubmit="return confirm(@js(__('Vorgang abschließen? Danach beginnt die Aufbewahrungsfrist.')))">
                                     @csrf
                                     <button class="primary small">{{ __('Abschließen') }}</button>
                                 </form>
@@ -146,15 +153,15 @@
 
         <div class="panel">
             <h2 style="margin-top:0">{{ __('Abgeschlossene Vorgänge (HR)') }}</h2>
-            <table>
-                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Abteilung') }}</th><th>{{ __('Vorgesetzter') }}</th><th>{{ __('Abgeschlossen am') }}</th><th></th></tr>
+            <table class="cards">
+                <tr><th>{{ __('Mitarbeiter') }}</th><th>{{ __('Abteilung') }}</th><th>{{ __('Vorgesetzter') }}</th><th>{{ __('Abgeschlossen am') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
                 @forelse($closedCases as $o)
                     <tr>
-                        <td>{{ $o->fullName() }} <span class="badge process">{{ $o->processLabel() }}</span></td>
-                        <td>{{ $o->department ?? '–' }}</td>
-                        <td>{{ $o->supervisor_name ?? $o->supervisor_username }}</td>
-                        <td>{{ $o->completed_at?->format('d.m.Y') ?? '–' }}</td>
-                        <td><a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a></td>
+                        <td data-label="{{ __('Mitarbeiter') }}"><a href="{{ route('onboardings.show', $o) }}">{{ $o->fullName() }}</a> <span class="badge process">{{ $o->processLabel() }}</span></td>
+                        <td data-label="{{ __('Abteilung') }}">{{ $o->department ?? '–' }}</td>
+                        <td data-label="{{ __('Vorgesetzter') }}">{{ $o->supervisor_name ?? $o->supervisor_username }}</td>
+                        <td data-label="{{ __('Abgeschlossen am') }}">{{ $o->completed_at?->format('d.m.Y') ?? '–' }}</td>
+                        <td class="actions"><a href="{{ route('onboardings.show', $o) }}">{{ __('Öffnen') }}</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="hint">{{ __('Noch keine abgeschlossenen Vorgänge.') }}</td></tr>

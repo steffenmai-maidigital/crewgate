@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && a2enmod rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
+# PHP-Einstellungen (ohne Versionsangabe, ohne Argumente in Stacktraces)
+# PHP settings (no version header, no arguments in stack traces)
+COPY docker/php.ini /usr/local/etc/php/conf.d/crewgate.ini
+
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

@@ -7,7 +7,13 @@
     $stored = ($prefill ?? [])[$field->id] ?? null;
     $storedArray = in_array($field->type, ['multiselect', 'product']) ? (json_decode($stored ?? '[]', true) ?: []) : [];
 @endphp
-<label for="f{{ $field->id }}">{{ $field->displayLabel() }}@if($field->required) *@endif</label>
+{{-- Mehrfachauswahl und Produkte sind Gruppen: Beschriftung als Gruppenname, sonst label for=
+     Multiple selection and products are groups: label as group name, otherwise label for= --}}
+@if(in_array($field->type, ['multiselect', 'product'], true))
+    <span class="group-label" id="l{{ $field->id }}">{{ $field->displayLabel() }}@if($field->required) *@endif</span>
+@else
+    <label for="f{{ $field->id }}" id="l{{ $field->id }}">{{ $field->displayLabel() }}@if($field->required) *@endif</label>
+@endif
 
 @if($field->type === 'select')
     <select id="f{{ $field->id }}" name="fields[{{ $field->id }}]" @if($field->required) required @endif>
@@ -18,7 +24,8 @@
     </select>
 
 @elseif($field->type === 'multiselect')
-    <div class="choice-list">
+    {{-- Gruppe mit der Beschriftung oben als Namen / group named by the label above --}}
+    <div class="choice-list" id="f{{ $field->id }}" role="group" aria-labelledby="l{{ $field->id }}">
         @foreach($field->options ?? [] as $opt)
             <label class="choice">
                 <input type="checkbox" name="fields[{{ $field->id }}][]" value="{{ $opt }}"
@@ -30,9 +37,9 @@
 
 @elseif($field->type === 'checkbox')
     <label class="choice">
-        <input type="checkbox" name="fields[{{ $field->id }}]" value="1"
+        <input type="checkbox" id="f{{ $field->id }}" name="fields[{{ $field->id }}]" value="1"
                @checked(old('fields.' . $field->id, $stored === \App\Models\CustomField::CHECKBOX_YES)) @if($field->required) required @endif>
-        Ja
+        {{ __('Ja') }}
     </label>
 
 @elseif($field->type === 'date')
@@ -53,8 +60,9 @@
         $grouped = $products->groupBy(fn ($p) => $p->category?->id ?? 0);
     @endphp
     @if($products->isEmpty())
-        <p class="hint">Für dieses Feld sind noch keine Produkte gepflegt (Menü → Produkte).</p>
+        <p class="hint" id="f{{ $field->id }}">{{ __('Für dieses Feld sind noch keine Produkte gepflegt (Menü „Produkte“).') }}</p>
     @else
+        <div id="f{{ $field->id }}" role="group" aria-labelledby="l{{ $field->id }}">
         @foreach($grouped as $group)
             @php($cat = $group->first()->category)
             <div class="cat-head" @if($cat) style="border-left-color: {{ $cat->color }}" @endif>
@@ -70,14 +78,15 @@
                         @endif
                         <span class="p-name">{{ $p->displayName() }}</span>
                         <span class="p-meta">
-                            @if($p->article_no)Art.: {{ $p->article_no }}<br>@endif
-                            @if($p->manufacturer_no)Herst.: {{ $p->manufacturer_no }}<br>@endif
+                            @if($p->article_no){{ __('Art.-Nr.:') }} {{ $p->article_no }}<br>@endif
+                            @if($p->manufacturer_no){{ __('Herst.-Nr.:') }} {{ $p->manufacturer_no }}<br>@endif
                             @if($p->price !== null)<strong>{{ $p->priceFormatted() }}</strong>@endif
                         </span>
                     </label>
                 @endforeach
             </div>
         @endforeach
+        </div>
     @endif
 
 @else {{-- Freitext / Free text --}}

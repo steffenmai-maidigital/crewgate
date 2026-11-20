@@ -108,6 +108,9 @@ class AuthController extends Controller
             $request->session()->put('login.2fa', [
                 'id' => $user->id, 'until' => now()->addMinutes(5)->timestamp,
                 'groups' => $groups, 'policy' => $policy,
+                // Passwort zwischen Passwort und Code geändert → neu anmelden
+                // password changed between password and code → sign in again
+                'fingerprint' => $user->passwordFingerprint(),
             ]);
 
             return redirect()->route('login.code');
@@ -166,6 +169,9 @@ class AuthController extends Controller
             // Pflicht ohne eingerichteten zweiten Faktor: erst einrichten (Middleware)
             // Mandatory without a second factor set up: set it up first (middleware)
             'mfa_pending' => $policy === Mfa::REQUIRED && ! $user->hasTwoFactor(),
+            // Neues Passwort (selbst oder durch einen Admin) beendet diese Sitzung (Middleware)
+            // A new password (own or by an admin) ends this session (middleware)
+            'password_fingerprint' => $user->passwordFingerprint(),
         ]);
         ActivityLog::write(ActivityLog::TYPE_SIGN_IN, 'Anmeldung (' . ($user->isLocal() ? 'eigenes Konto' : 'Verzeichnis') . ')', $user->username);
 
@@ -237,8 +243,9 @@ class AuthController extends Controller
         if (! $p || ($p['until'] ?? 0) < time()) {
             return null;
         }
+        $user = User::find($p['id']);
 
-        return User::find($p['id']);
+        return $user && hash_equals((string) ($p['fingerprint'] ?? ''), $user->passwordFingerprint()) ? $user : null;
     }
 
     public function logout(Request $request)

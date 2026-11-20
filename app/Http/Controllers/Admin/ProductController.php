@@ -117,7 +117,7 @@ class ProductController extends Controller
             'Produkte' => $candidates->pluck('name')->implode(', ') ?: '–',
         ]);
 
-        return back()->with('ok', $candidates->count() . ' Produkt(e) bereinigt.');
+        return back()->with('ok', __(':n deaktivierte Produkte bereinigt.', ['n' => $candidates->count()]));
     }
 
     // ---- Kategorien / Categories ----
@@ -225,7 +225,9 @@ class ProductController extends Controller
         }
 
         $file = $request->file('image');
-        $name = 'produkt-' . time() . '-' . random_int(100, 999) . '.' . strtolower($file->getClientOriginalExtension());
+        // Endung aus dem Inhalt, nie aus dem Dateinamen des Absenders (sonst z. B. „.html“)
+        // extension from the content, never from the sender's file name (otherwise e.g. ".html")
+        $name = 'produkt-' . time() . '-' . random_int(100, 999) . '.' . \App\Http\Controllers\Admin\SettingController::imageExtension($file);
         $file->move(public_path('uploads/products'), $name);
 
         return 'uploads/products/' . $name;

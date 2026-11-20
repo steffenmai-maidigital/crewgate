@@ -17,31 +17,34 @@
     </div>
 
     <div class="panel">
-        <table class="manage">
-            <tr><th>{{ __('Reihenfolge') }}</th><th>{{ __('Name') }}</th><th>{{ __('Gruppe im Verzeichnis (DN oder Name)') }}</th><th>{{ __('Zentrale E-Mail') }}</th><th>{{ __('Sieht Daten von') }}</th><th>{{ __('Im Workflow') }}</th><th></th></tr>
+        <table class="manage cards">
+            <tr><th>{{ __('Reihenfolge') }}</th><th>{{ __('Name') }}</th><th>{{ __('Gruppe im Verzeichnis (DN oder Name)') }}</th><th>{{ __('Zentrale E-Mail') }}</th><th>{{ __('Sieht Daten von') }}</th><th>{{ __('Im Workflow') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
             @foreach($roles as $role)
                 <tr>
                     <form method="post" action="{{ route('admin.roles.update', $role) }}">
                         @csrf @method('PUT')
-                        <td style="width:90px"><input type="number" name="sort_order" value="{{ $role->sort_order }}" min="0" aria-label="{{ __('Reihenfolge') }}"></td>
-                        <td><input type="text" name="name" value="{{ $role->name }}" aria-label="{{ __('Name') }}"></td>
-                        <td><input type="text" name="ad_group_dn" value="{{ $role->ad_group_dn }}" placeholder="CN=IT,OU=Gruppen,DC=firma,DC=local" aria-label="{{ __('Gruppe im Verzeichnis (DN oder Name)') }}"></td>
-                        <td><input type="email" name="central_email" value="{{ $role->central_email }}" placeholder="it-onboarding@firma.local" aria-label="{{ __('Zentrale E-Mail') }}"></td>
-                        <td style="width:170px">
+                        <td style="width:90px" data-label="{{ __('Reihenfolge') }}"><input type="number" name="sort_order" value="{{ $role->sort_order }}" min="0" aria-label="{{ __('Reihenfolge') }}"></td>
+                        <td data-label="{{ __('Name') }}">
+                            <input type="text" name="name" value="{{ $role->name }}" aria-label="{{ __('Name') }}">
+                            <input type="text" name="name_en" value="{{ $role->name_en }}" placeholder="{{ __('Name (EN, optional)') }}" aria-label="{{ __('Name (EN, optional)') }}" style="margin-top:.3rem">
+                        </td>
+                        <td data-label="{{ __('Gruppe im Verzeichnis (DN oder Name)') }}"><input type="text" name="ad_group_dn" value="{{ $role->ad_group_dn }}" placeholder="CN=IT,OU=Gruppen,DC=firma,DC=local" aria-label="{{ __('Gruppe im Verzeichnis (DN oder Name)') }}"></td>
+                        <td data-label="{{ __('Zentrale E-Mail') }}"><input type="email" name="central_email" value="{{ $role->central_email }}" placeholder="it-onboarding@firma.local" aria-label="{{ __('Zentrale E-Mail') }}"></td>
+                        <td style="width:170px" data-label="{{ __('Sieht Daten von') }}">
                             <select name="visible_role_ids[]" multiple size="3" title="{{ __('Mehrfachauswahl mit Strg/Cmd. Eigene Felder sieht die Rolle immer.') }}" aria-label="{{ __('Sieht Daten von') }}">
                                 @foreach($roles->where('id', '!=', $role->id) as $other)
-                                    <option value="{{ $other->id }}" @selected(in_array($other->id, $role->visible_role_ids ?? []))>{{ $other->name }}</option>
+                                    <option value="{{ $other->id }}" @selected(in_array($other->id, $role->visible_role_ids ?? []))>{{ $other->displayName() }}</option>
                                 @endforeach
                             </select>
                         </td>
-                        <td style="width:70px;text-align:center">
+                        <td style="width:70px;text-align:center" data-label="{{ __('Im Workflow') }}">
                             @if($role->is_intake)
                                 <span class="badge" title="{{ __('Felder erscheinen beim Anlegen eines Vorgangs') }}">{{ __('Anlage') }}</span>
                             @else
                                 <input type="checkbox" name="in_workflow" value="1" @checked($role->in_workflow) aria-label="{{ __('Im Workflow') }}">
                             @endif
                         </td>
-                        <td style="white-space:nowrap">
+                        <td class="actions" style="white-space:nowrap">
                             <button class="primary small">{{ __('Speichern') }}</button>
                     </form>
                     @unless($role->is_intake)
@@ -61,11 +64,13 @@
         <form method="post" action="{{ route('admin.roles.store') }}">
             @csrf
             <div class="row">
-                <div><label>{{ __('Name') }}</label><input type="text" name="name" required></div>
-                <div><label>{{ __('Gruppe im Verzeichnis (DN oder Name)') }}</label><input type="text" name="ad_group_dn"></div>
-                <div><label>{{ __('Zentrale E-Mail') }}</label><input type="email" name="central_email"></div>
-                <div style="max-width:120px"><label>{{ __('Reihenfolge') }}</label><input type="number" name="sort_order" value="{{ ($roles->max('sort_order') ?? 0) + 1 }}" min="0"></div>
+                <div><label for="role-new-name">{{ __('Name') }}</label><input type="text" id="role-new-name" name="name" required></div>
+                <div><label for="role-new-name-en">{{ __('Name (EN, optional)') }}</label><input type="text" id="role-new-name-en" name="name_en" placeholder="Purchasing"></div>
+                <div><label for="role-new-group">{{ __('Gruppe im Verzeichnis (DN oder Name)') }}</label><input type="text" id="role-new-group" name="ad_group_dn"></div>
+                <div><label for="role-new-mail">{{ __('Zentrale E-Mail') }}</label><input type="email" id="role-new-mail" name="central_email"></div>
+                <div style="max-width:120px"><label for="role-new-order">{{ __('Reihenfolge') }}</label><input type="number" id="role-new-order" name="sort_order" value="{{ ($roles->max('sort_order') ?? 0) + 1 }}" min="0"></div>
             </div>
+            <p class="hint">{{ __('Ein Gruppenname wird beim Speichern zum vollständigen DN aufgelöst. Gibt es den Namen mehrfach im Verzeichnis, bitte den DN eintragen.') }}</p>
             <label class="choice"><input type="checkbox" name="in_workflow" value="1" checked> {{ __('Im Workflow aktiv') }}</label>
             <button class="primary">{{ __('Anlegen') }}</button>
         </form>

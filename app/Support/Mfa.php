@@ -103,6 +103,20 @@ class Mfa
         return $best ?? self::OPTIONAL;
     }
 
+    /**
+     * Die strengere von zwei Stufen. Die Middleware vergleicht damit je Anfrage
+     * die Stufe aus der Anmeldung mit der aktuellen (Beförderung, neue Richtlinie),
+     * damit eine neue Pflicht sofort gilt und nicht erst bei der nächsten Anmeldung.
+     *
+     * The stricter of two levels. The middleware uses it on every request to
+     * compare the level from sign-in with the current one (promotion, new
+     * policy), so a new requirement applies at once, not only at the next sign-in.
+     */
+    public static function stricter(string $a, string $b): string
+    {
+        return (self::RANK[$a] ?? 1) >= (self::RANK[$b] ?? 1) ? $a : $b;
+    }
+
     public static function isRequired(User $user, array $directoryGroups = []): bool
     {
         return self::policy($user, $directoryGroups) === self::REQUIRED;

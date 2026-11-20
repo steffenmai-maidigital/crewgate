@@ -40,7 +40,7 @@
     foreach ($roles as $r) {
         $isDone = in_array($r->id, $doneIds);
         $steps[] = [
-            'label' => $r->name,
+            'label' => $r->displayName(),
             'done' => $isDone,
             'current' => $status === 'open' && ! $isDone,
             'title' => $o ? ($isDone ? __('quittiert') : __('Quittierung ausstehend')) : __('Abteilung quittiert den Erhalt'),
@@ -68,6 +68,9 @@
             <div class="flow-step {{ $step['done'] ? 'done' : '' }} {{ $step['current'] ? 'current' : '' }}" title="{{ $step['title'] }}">
                 <div class="flow-circle">{{ $step['done'] ? '✓' : $i + 1 }}</div>
                 <div class="flow-label">{{ $step['label'] }}</div>
+                {{-- Stand des Schritts auch ohne Maus (Tooltip) für Bildschirmleser
+                     State of the step without a mouse (tooltip) for screen readers --}}
+                <span class="sr-only">{{ $step['title'] }}</span>
             </div>
             @if(!$loop->last)<div class="flow-line {{ $step['done'] ? 'done' : '' }}"></div>@endif
         @endforeach

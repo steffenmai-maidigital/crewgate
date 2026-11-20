@@ -30,12 +30,12 @@
                 </div>
             </div>
 
-            <label for="supervisor_username">{{ __('Vorgesetzter (AD-Benutzername oder Name)') }}</label>
+            <label for="supervisor_username">{{ __('Vorgesetzter (Benutzername oder Name)') }}</label>
             <div class="row">
-                <div><input type="text" id="supervisor_username" name="supervisor_username" value="{{ old('supervisor_username') }}" required></div>
-                <div style="flex:0"><button type="button" class="primary small" id="btn-lookup" style="margin-top:0">{{ __('Im AD suchen') }}</button></div>
+                <div><input type="text" id="supervisor_username" name="supervisor_username" value="{{ old('supervisor_username') }}" required aria-describedby="lookup-result"></div>
+                <div style="flex:0"><button type="button" class="primary small" id="btn-lookup" style="margin-top:0">{{ __('Suchen') }}</button></div>
             </div>
-            <p class="hint" id="lookup-result">Die Abteilung des Vorgesetzten wird aus dem Active Directory gelesen – dort wird der neue Mitarbeiter arbeiten.</p>
+            <p class="hint" id="lookup-result" aria-live="polite">{{ __('Die Abteilung des Vorgesetzten kommt aus dem Verzeichnis bzw. aus seinem CrewGate-Konto – dort wird der Mitarbeiter arbeiten.') }}</p>
 
             @if($intakeFields->isNotEmpty())
                 <h2>{{ __('Angaben zur Stelle') }}</h2>
@@ -47,8 +47,8 @@
             @endif
 
             <div class="row">
-                <div><label>{{ __('Erledigen bis: Vorgesetzter (optional)') }}</label><input type="date" name="supervisor_due_date" value="{{ old('supervisor_due_date') }}"></div>
-                <div><label>{{ __('Erledigen bis: Abteilungen (optional)') }}</label><input type="date" name="roles_due_date" value="{{ old('roles_due_date') }}"></div>
+                <div><label for="supervisor_due_date">{{ __('Erledigen bis: Vorgesetzter (optional)') }}</label><input type="date" id="supervisor_due_date" name="supervisor_due_date" value="{{ old('supervisor_due_date') }}"></div>
+                <div><label for="roles_due_date">{{ __('Erledigen bis: Abteilungen (optional)') }}</label><input type="date" id="roles_due_date" name="roles_due_date" value="{{ old('roles_due_date') }}"></div>
             </div>
             <p class="hint">{{ __('Bei Erreichen der Frist geht automatisch eine Erinnerung mit den offenen Aufgaben an den Vorgesetzten. Erinnerungen an die Abteilungen lassen sich in den Einstellungen aktivieren.') }}</p>
 
@@ -81,26 +81,39 @@
     </div>
 
     <script>
-        document.getElementById('btn-lookup').addEventListener('click', async () => {
-            const q = document.getElementById('supervisor_username').value.trim();
-            const out = document.getElementById('lookup-result');
-            if (q.length < 2) { out.textContent = 'Bitte mindestens 2 Zeichen eingeben.'; return; }
-            out.textContent = 'Suche im AD …';
-            try {
-                const res = await fetch('{{ route('ad.supervisor') }}?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
-                const data = await res.json();
-                if (!res.ok) { out.textContent = data.error || 'Fehler bei der AD-Suche.'; return; }
-                out.textContent = 'Gefunden: ' + (data.name || data.username) + ' – Abteilung: ' + (data.department || 'nicht gepflegt');
-                if (data.username) document.getElementById('supervisor_username').value = data.username;
-            } catch (e) {
-                out.textContent = 'AD-Suche nicht erreichbar.';
-            }
-        });
+        // Vorgesetzten im Verzeichnis und in den eigenen Konten suchen
+        // Search the supervisor in the directory and the own accounts
+        (function () {
+            const text = @js([
+                'short' => __('Bitte mindestens 2 Zeichen eingeben.'),
+                'busy' => __('Suche …'),
+                'failed' => __('Fehler bei der Suche.'),
+                'found' => __('Gefunden:'),
+                'department' => __('Abteilung:'),
+                'none' => __('nicht gepflegt'),
+                'offline' => __('Die Suche ist gerade nicht erreichbar.'),
+            ]);
+            document.getElementById('btn-lookup').addEventListener('click', async () => {
+                const q = document.getElementById('supervisor_username').value.trim();
+                const out = document.getElementById('lookup-result');
+                if (q.length < 2) { out.textContent = text.short; return; }
+                out.textContent = text.busy;
+                try {
+                    const res = await fetch(@js(route('ad.supervisor')) + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+                    const data = await res.json();
+                    if (!res.ok) { out.textContent = data.error || text.failed; return; }
+                    out.textContent = text.found + ' ' + (data.name || data.username) + ' – ' + text.department + ' ' + (data.department || text.none);
+                    if (data.username) document.getElementById('supervisor_username').value = data.username;
+                } catch (e) {
+                    out.textContent = text.offline;
+                }
+            });
+        })();
     </script>
 
     <div class="panel">
         <h2 style="margin-top:0">{{ __('Mehrere Mitarbeiter per CSV anlegen') }}</h2>
-        <p class="hint" style="margin-top:0">{{ __('Für Sammel-Anlagen (z. B. Ausbildungsjahrgang) gibt es einen geführten Assistenten: Vorlage herunterladen, ausfüllen, hochladen – anschließend prüfen Sie jede Zeile, wählen den Vorgesetzten aus dem AD und legen die Vorgänge einzeln an.') }}</p>
+        <p class="hint" style="margin-top:0">{{ __('Für Sammel-Anlagen (z. B. Ausbildungsjahrgang) gibt es einen geführten Assistenten: Vorlage herunterladen, ausfüllen, hochladen – anschließend prüfen Sie jede Zeile, wählen den Vorgesetzten aus und legen die Vorgänge einzeln an.') }}</p>
         <a class="primary small" style="text-decoration:none;padding:.45rem .9rem;border-radius:10px;display:inline-block" href="{{ route('onboardings.import') }}">{{ __('Import-Assistenten öffnen') }}</a>
     </div>
 @endsection

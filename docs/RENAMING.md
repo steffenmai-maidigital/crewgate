@@ -19,6 +19,11 @@ Shared building blocks (Directory, Mfa, TwoFactor, Fox, LegalPages,
 ProductInfo, ErrorPage) use the same
 names in CrewGate, LinkHub and BilDaBooky.
 
+The fox helper (`Fox`, `fox.js`, `users.fox`, `fox_enabled`, `/account/fox`)
+has since been removed; the migration
+`database/migrations/0001_01_01_000017_remove_fox_helper.php` drops its column
+and setting. Its rows below only matter for old forks and scripts.
+
 ## Files and folders
 
 | old | new |

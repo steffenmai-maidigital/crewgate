@@ -8,6 +8,82 @@ tragen die Version 1.0 mit Build-Zeitstempel (JJMMTTHHMM).
 
 ## [Unveröffentlicht]
 
+## [26112001] — 2026-11-20
+
+### Neu
+
+- **Rollen mit englischem Namen:** Unter **Rollen** hat jede Rolle das Feld „Name (EN, optional)“, wie Felder, Produkte und Prozesse. Die englische Oberfläche zeigt ihn überall, wo Abteilungen genannt sind (Workflow, Übersicht, Vorgang, Quittierungen, Felder, Produkte, Prozesse, Benutzer); ohne englischen Namen erscheint der deutsche. In den zweisprachigen E-Mails steht im englischen Teil der englische Name, Betreff und Datenliste nennen beide; der Audit-Bericht nennt beide („Einkauf / Purchasing“). Die API liefert zusätzlich `role_en`. Die feste Rolle „HR (Anlage des Vorgangs)“ heißt englisch „HR (case creation)“, die Demo-Rollen „IT“, „Purchasing“ und „Facility management“. Migration `role_english_names` (Spalte `roles.name_en`).
+- **Startpasswort muss geändert werden:** Der erste Admin mit Zufallspasswort, Konten mit einem Passwort vom Admin (beim Anlegen oder unter **Bearbeiten → Neues Passwort**), Konten nach **Passwort zurücksetzen** und nach dem Notzugang müssen bei der nächsten Anmeldung ein eigenes Passwort vergeben. Bis dahin öffnen sich nur **Mein Konto** und **Abmelden**, auch keine Hilfe. Die Benutzerliste zeigt solche Konten mit „Startpasswort“. Nicht für Verzeichniskonten und nicht im Demo-Modus. Migration `must_change_password` (Spalte `users.must_change_password`, bestehende Konten sind nicht betroffen).
+- **Notzugang ohne Zwei-Faktor:** `php artisan crewgate:admin-password [name] --disable-2fa` setzt zusätzlich die Zwei-Faktor-Anmeldung dieses Admins zurück (Handy verloren). Wie bisher legt der Befehl ein fehlendes eigenes Admin-Konto an; das neue Passwort ist ein Startpasswort, und der Befehl steht im Protokoll.
+
+### Sicherheit
+
+- **Sicherungsdateien nicht für alle lesbar:** Die ZIP-Dateien in `backups` entstehen mit den Rechten `0640` (wie LinkHub). Zum Prüfen oder Kopieren auf dem Host `sudo` verwenden.
+- **Neues Passwort beendet die anderen Sitzungen:** Nach dem eigenen Passwortwechsel enden alle anderen Anmeldungen dieses Kontos, die laufende bleibt. Setzt ein Admin das Passwort zurück oder vergibt ein neues (auch per Notzugang), enden alle Anmeldungen der Person. Dazu trägt jede Sitzung einen Fingerabdruck des Passwort-Hashes, den jede Anfrage prüft. Wer zwischen Passwort und Code der Zwei-Faktor-Anmeldung steht, muss sich danach ebenfalls neu anmelden. **Nach dem Update einmal neu anmelden.**
+- **Sicherungen mit Schlüssel:** Die nächtliche Sicherung und „Jetzt sichern“ enthalten jetzt `.app_key` (aus `/data`, neben der Datenbank). Damit sind das Servicekonto-Passwort und die Zwei-Faktor-Geheimnisse nach einer Wiederherstellung auf neuer Hardware lesbar. Die Sicherungen bleiben auf dem Server, einen Download im Browser gibt es nicht. Den Ordner `backups` nur Administratoren zugänglich machen.
+- **Gruppen eindeutig:** Admin-, HR-, „Vorgänge anlegen“- und Auditoren-Gruppe, die Verzeichnisgruppen mit Pflicht und die Gruppe je Rolle werden beim Speichern zum vollständigen DN aufgelöst, sobald das Verzeichnis eingeschaltet ist. Gibt es einen Gruppennamen in mehreren OUs, kommt eine Fehlermeldung am Feld, und der alte Wert bleibt. Bisher zählte jede gleichnamige Gruppe, auch eine fremde in einer anderen OU.
+- **API v2 prüft wie das Formular:** `POST /api/v2/cases` nimmt nur aktive Prozesse an und prüft die Anlage-Felder (Pflicht, Format, Auswahl-Optionen). Sonst kommt 422 mit Fehlern je Feld (`fields.<id>`), auch ohne `Accept: application/json`. Bisher legte die API Vorgänge ohne Pflichtangaben und mit beliebigen Werten an.
+- **Freitext mit Format:** höchstens 2000 Zeichen. Der reguläre Ausdruck eines Feldes läuft mit kleiner Rückschritt-Grenze; ein Ausdruck, der zu aufwendig wird (z. B. `^(a+)+$` bei langer Eingabe), ergibt eine Meldung am Feld statt langer Rechenzeit.
+- Das eigene Passwort lässt sich unter **Benutzer** nicht mehr „zurücksetzen“ (die Sitzung endete sofort, das Startpasswort stand nirgends). Dafür gibt es **Mein Konto**.
+
+### Entfernt
+
+- **Fuchs-Helfer Rua** samt Einstellung (Einstellungen → 10 · Fuchs-Helfer) und Konto-Schalter (Mein Konto → Fuchs-Helfer). Die Oberfläche siezt jetzt ohne Ausnahme. Die neue Migration `remove_fox_helper` löscht beim ersten Start die Spalte `users.fox` und die Einstellung `fox_enabled`; alte Fuchs-Einträge im Browser (`cg-fox-*`, `cg-fuchs-*`) räumt die Seite einmal weg. Die Adresse `/account/fox` gibt es nicht mehr.
+
+### Sicherheit
+
+- **Passwort des Servicekontos geht nicht mehr an fremde Server:** Ändert man unter Einstellungen → Anmeldung Server, Port, Verschlüsselung oder Servicekonto, ohne das Passwort neu einzugeben, gilt das alte nicht mehr. Bisher schickte „Verbindung testen“ es an den neuen, womöglich fremden Server (auch das Passwort aus `docker-compose.yml`). Nach einem Serverwechsel das Passwort also neu eintragen.
+- **Keine Passwörter mehr im Fehlerprotokoll:** War das Verzeichnis nicht erreichbar, stand der Anfang des eingegebenen Passworts im Stacktrace von `laravel.log`. Passwort-Parameter sind jetzt als sensibel markiert, und `docker/php.ini` setzt `zend.exception_ignore_args = On`, `expose_php = Off` und `display_errors = Off`.
+- **Verzeichnis mit Zeitlimit je Abfrage:** Ein Server, der die Verbindung annimmt und nicht antwortet, blockiert die Anmeldung nicht mehr unbegrenzt.
+- **Bestätigung im Konto gebremst:** Passwort bzw. App-Code zum Ausschalten der Zwei-Faktor-Anmeldung und für neue Wiederherstellungscodes: nach 5 Fehlversuchen 5 Minuten Pause; ein App-Code gilt nur einmal.
+- **Demo-Modus aus:** `docker-compose.yml` wird mit `DEMO_MODE: "false"` ausgeliefert; den Demo-Modus schaltet man zum Ausprobieren selbst ein.
+- **Mailserver-Passwort:** Ändern sich Server, Port, Verschlüsselung oder Benutzer des Mailservers ohne neues Passwort, gilt das alte nicht mehr (sonst ging es mit der Testmail an den neuen Server).
+- **Demo-Konten nach dem Demo-Modus:** Wer erst mit `DEMO_MODE=true` startet und dann auf Normalbetrieb umstellt, behielt Konten wie `max.admin` (Admin und HR) mit dem Passwort „demo“. Jetzt bekommt beim Start im Normalbetrieb jedes Demo-Konto, das noch „demo“ als Passwort hat, ein neues Startpasswort (einmal im Container-Protokoll); Demo-Konten ohne Admin-Recht werden zusätzlich gesperrt.
+- **Vorgesetzter ist, wer als Vorgesetzter eingetragen ist** (Benutzername), nicht mehr jeder aus derselben Abteilung. Kollegen derselben Abteilung sahen bisher alle Angaben, auch zu Austritten, und konnten die Vorbereitung pflegen; jetzt sehen sie nur die Kopfdaten (Name, Prozess, Datum, Stand).
+- Eine strengere Zwei-Faktor-Stufe gilt ab der nächsten Seite, nicht erst bei der nächsten Anmeldung. Wer dann noch keinen zweiten Faktor hat, kommt nur noch auf **Mein Konto**.
+- Zwei-Faktor lässt sich bei der Stufe „aus“ auch über die Bestätigungsadresse nicht einrichten.
+- „Protokoll leeren“ (Hilfe → Letzte Fehler) ist zusätzlich über die Admin-Middleware geschützt.
+- Vorgänge öffnen nur noch Berechtigte: HR, Administratoren, Auditoren, Abteilungen im Workflow, der eingetragene Vorgesetzte und jeder für selbst angelegte Vorgänge; Kollegen derselben Abteilung sehen die Kopfdaten. Bisher zeigte jede erratene Vorgangsnummer jedem angemeldeten Konto Name, Notizen und Stand des Vorgangs.
+- Gesperrte und gelöschte Konten werden sofort abgemeldet, nicht erst beim Ablauf der Sitzung. Rechte eigener Konten (Menü **Benutzer**) gelten ab der nächsten Seite.
+- Hochgeladene Bilder (Logo, Produktbilder) bekommen ihre Endung aus dem Inhalt, nicht aus dem Dateinamen. Bisher ließ sich ein Bild als `.html` ablegen und als Seite aufrufen. Unter `/uploads/` liefert der Webserver nur noch Bilddateien aus, mit eigener Content-Security-Policy (`sandbox`) und `nosniff`.
+- Namen von Produkten und Kategorien in Löschen-Dialogen werden sicher maskiert; ein Name mit Apostroph konnte dort Skript ausführen.
+- Felder lassen sich nicht mehr in die Rolle einer anderen Abteilung verschieben.
+- CSV-Export des Protokolls mit Formelschutz: Zellen, die mit `=`, `+`, `-`, `@`, Tabulator oder Apostroph beginnen, bekommen ein Apostroph davor. Für die Hash-Prüfung dieses Apostroph entfernen.
+- Die Vorgesetzten-Suche zeigt bei Verzeichnisfehlern keine technischen Einzelheiten mehr; sie stehen im Protokoll.
+- Die Sprachwahl leitet nur noch auf Seiten der eigenen Anwendung zurück, nie auf eine fremde Adresse aus dem `Referer`.
+
+### Behoben
+
+- Der monatliche Audit-Bericht brach bei großem Protokoll mit „Speicher erschöpft“ ab (PHP-Grenze 128 MB). `docker/php.ini` setzt jetzt 256 MB.
+- Der Schalter **Erinnerung an die Abteilungen** fehlte in den Einstellungen (Bereich 2); jedes Speichern schaltete die Erinnerungen an die Abteilungen aus. Er ist wieder da.
+- SVG-Logos wurden abgelehnt („muss ein Bild sein“), obwohl die Einstellungen sie anbieten. Einfache SVG-Logos gehen wieder; SVGs mit Skripten, Ereignissen oder Verweisen nach außen werden mit einer Meldung abgelehnt.
+- Ein abgebrochener Vorgang lässt sich nicht ein zweites Mal abbrechen (bisher zweiter Protokolleintrag und zweite Mail an den Vorgesetzten).
+- Du-Anrede in der Übersicht ersetzt: „Ihre Daten“, „Vorgänge in Ihrer Abteilung“, „Vorgänge (Beteiligung Ihrer Abteilung)“.
+- „Der/die Vorgesetzte“ in zwei Meldungen durch „Der Vorgesetzte“ ersetzt (Standard: generisches Maskulinum).
+- Englische Oberfläche: Texte auf den Seiten Produkte, Felder, Protokoll, Mail-Log, Neuer Vorgang und Import-Assistent sowie in den Bestätigungsdialogen waren nur deutsch. Die Gründe auf Fehlerseiten (z. B. „Nur HR darf Vorgänge löschen.“) erscheinen jetzt auch auf Englisch.
+- Protokoll: Typen erscheinen übersetzt („Vorgänge“, „Löschungen“ …) statt als gespeicherter Schlüssel; der Filter bietet alle Typen an, auch Benutzer, Anmeldungen und Exporte.
+- Die Kennzahlen der Übersicht zählen für Auditoren alle Vorgänge (bisher 0).
+
+### Geändert
+
+- Die Vorbereitung pflegt nur noch der eingetragene Vorgesetzte (neben HR und dem Ersteller), nicht mehr jedes Konto derselben Abteilung. Stimmt der eingetragene Benutzername nicht, pflegt HR die Angaben oder legt den Vorgang mit dem richtigen Vorgesetzten neu an.
+- Vorgesetzten-Suche ohne „AD“ im Namen: Feld „Vorgesetzter (Benutzername oder Name)“, Knopf „Suchen“. Gesucht wird wie bisher im Verzeichnis und in den eigenen Konten.
+- Übersicht ohne Aufgaben zeigt einen Satz statt einer leeren Seite.
+- Übersicht und Benutzer: Der Name öffnet den Vorgang bzw. das Konto (am Telefon lagen „Öffnen“ und „Bearbeiten“ außerhalb des Bildes). Am Telefon bricht die Kopfzeile um, statt „Abmelden“ abzuschneiden.
+- Barrierefreiheit: sichtbarer Fokusrahmen, dunklere Hinweisschrift (Kontrast nach WCAG AA), Beschriftungen für alle Eingabefelder in Tabellen, Stand der Workflow-Schritte auch für Bildschirmleser, keine Animationen bei „Bewegung reduzieren“, Bedienflächen auf Touch-Geräten mindestens 44 px hoch.
+- **Tabellen am Telefon als Karten:** Unter 640 px Breite stehen die Zeilen von Übersicht, Vorgang, Benutzer, Rollen, Felder, Produkte, Prozesse, Protokoll und Mail-Log als Karten untereinander, jeder Wert mit seiner Spaltenbezeichnung. Seitliches Scrollen entfällt; die Tabellen der Hilfe stehen ebenfalls untereinander.
+- **Beschriftungen fest verknüpft:** Jedes Eingabefeld hat in der Vorlage eine eigene Beschriftung (`for`/`id`, `aria-label` bzw. Gruppenname bei Mehrfachauswahl). Das Skript, das Beschriftungen nachträglich mit Feldern verband, entfällt.
+- Einstellungen: Scheitert eine Gruppe an einem mehrdeutigen Namen, sind die übrigen Einstellungen gespeichert; das Formular zeigt die Eingabe mit der Meldung.
+
+### Dokumentation
+
+- Betrieb (de/en): Sicherung enthält `.app_key`, Wiederherstellung spielt ihn mit zurück; Notzugang mit `--disable-2fa`. Administratorhandbuch: eigene Konten und Startpasswort, Sitzungen nach Passwortwechsel, englische Rollennamen, Gruppen als DN. API-Dokumentation: Prüfung der Anlage-Felder, 422-Antwort, `role_en`.
+- `SECURITY.md` beschreibt die bekannte Folge des Standardwerts von `TRUSTED_PROXIES`: Geräte im internen Netz können ihre Adresse vortäuschen und die Anmeldebremse je Adresse umgehen; wer das vermeiden will, trägt nur die IP des Reverse Proxys ein.
+- `SECURITY.md` sagte, die Anmeldung habe keine eigene Bremse. Sie hat eine (10 Versuche je Minute und Adresse, je Benutzername 10 Fehlversuche → 30 Minuten); korrigiert.
+- Administratorhandbuch: Kapitelnummern bereinigt (zwei Kapitel 7, 9 und 10), Einstellungen in der Reihenfolge der Oberfläche (1–10, neu: 4.9 API), Wirkung von Sperren und Rechten, Formelschutz im CSV-Export.
+- Sicherheitsarchitektur und `SECURITY.md`: Zugriff auf Vorgänge, Kontoprüfung je Anfrage, Uploads, CSV-Export; `SECURITY.md` beschrieb noch „Anmeldung nur über Active Directory“.
+- Benutzerhandbuch: Überschriften wie in der Oberfläche, neue Frage zu Fehler 403.
+
 ## [26101802] — 2026-10-18
 
 ### Dokumentation

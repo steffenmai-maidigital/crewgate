@@ -33,9 +33,17 @@ class SettingController extends Controller
         'mail_tpl_reminder_role_de', 'mail_tpl_reminder_role_en',
         'reminder_roles_enabled',
         'api_token',
-        'fox_enabled',
         'mfa_admin', 'mfa_hr', 'mfa_auditor', 'mfa_create', 'mfa_department', 'mfa_other', 'mfa_required_groups',
     ];
+
+    /**
+     * Gruppen im Verzeichnis (DN oder Name, mfa_required_groups eine je Zeile):
+     * nach Directory::save() eindeutig zum DN aufgelöst gespeichert
+     *
+     * Directory groups (DN or name, mfa_required_groups one per line):
+     * stored after Directory::save(), resolved unambiguously to their DN
+     */
+    private const GROUP_KEYS = ['ad_group_hr', 'ad_group_create', 'ad_group_admin', 'ad_group_auditor', 'mfa_required_groups'];
 
     public function index()
     {
@@ -76,7 +84,9 @@ class SettingController extends Controller
             'brand_accent_color' => ['nullable', $hex],
             'brand_footer_color' => ['nullable', $hex],
             'brand_footer_text' => ['nullable', 'string', 'max:255'],
-            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
+            // SVG ausdrücklich erlauben (Laravel lässt es sonst nicht als Bild gelten)
+            // allow SVG explicitly (otherwise Laravel does not accept it as an image)
+            'logo' => ['nullable', 'image:allow_svg', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
             'license_company' => ['nullable', 'string', 'max:150'],
             'license_key' => ['nullable', 'string', 'max:20'],
             'portal_url' => ['nullable', 'url', 'max:255'],
@@ -100,7 +110,18 @@ class SettingController extends Controller
             'mfa_required_groups' => ['nullable', 'string', 'max:4000'],
         ] + Directory::rules(), [
             'ldap_user_filter.regex' => __('Der Benutzerfilter muss ein vollständiger LDAP-Filter in Klammern sein, z. B. (objectClass=person).'),
+        ], [
+            'logo' => __('Firmenlogo'),
         ]);
+
+        // SVG-Logo nur ohne Skripte, Ereignisse und eingebettete Inhalte
+        // SVG logo only without scripts, event handlers and embedded content
+        if ($request->hasFile('logo') && $request->file('logo')->guessExtension() === 'svg'
+            && ! self::svgIsPlain((string) file_get_contents($request->file('logo')->getRealPath()))) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'logo' => __('Das SVG-Logo enthält Skripte, Verweise oder eingebettete Inhalte. Bitte ein einfaches SVG oder ein PNG verwenden.'),
+            ]);
+        }
 
         // Lizenzschlüssel nur nach Schema akzeptieren (1|2 + 8x Kundennr. +
         // JJMMTT Supportende + 5-stellige Anzahl)
@@ -127,12 +148,30 @@ class SettingController extends Controller
         $data['retention_enabled'] = $request->boolean('retention_enabled') ? '1' : '0';
         $data['reminder_roles_enabled'] = $request->boolean('reminder_roles_enabled') ? '1' : '0';
         $data['audit_report_enabled'] = $request->boolean('audit_report_enabled') ? '1' : '0';
-        $data['fox_enabled'] = $request->boolean('fox_enabled') ? '1' : '0';
+
+        // Ändern sich Server, Port, Verschlüsselung oder Benutzer des Mailservers und kommt
+        // kein neues Passwort, gilt das alte nicht mehr – sonst ginge es beim Testmail an
+        // einen womöglich fremden Server (wie Directory::save)
+        // If host, port, encryption or user of the mail server change and no new password
+        // comes, the old one no longer applies – otherwise the test mail would send it to a
+        // possibly foreign server (like Directory::save)
+        $smtpMoved = false;
+        foreach (['smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username'] as $key) {
+            if (trim((string) ($data[$key] ?? '')) !== trim((string) Setting::get($key, ''))) {
+                $smtpMoved = true;
+            }
+        }
 
         foreach (self::KEYS as $key) {
-            // Leeres Passwortfeld = altes Passwort behalten
-            // Empty password field = keep the old password
+            if (in_array($key, self::GROUP_KEYS, true)) {
+                continue;   // unten nach dem Verzeichnis / below, after the directory
+            }
+            // Leeres Passwortfeld = altes Passwort behalten (außer der Server hat sich geändert)
+            // Empty password field = keep the old password (unless the server changed)
             if ($key === 'smtp_password' && blank($data[$key] ?? null)) {
+                if ($smtpMoved) {
+                    Setting::set($key, null);
+                }
                 continue;
             }
             Setting::set($key, $data[$key] ?? null);
@@ -142,6 +181,20 @@ class SettingController extends Controller
         // Sign-in via the directory (Standard 09)
         Directory::save($request->only(Directory::KEYS) + ['ldap_enabled' => $request->boolean('ldap_enabled'), 'ldap_certificate' => $request->boolean('ldap_certificate')]);
 
+        // Gruppennamen mit den neuen Verbindungsdaten zum DN auflösen; ein Name,
+        // den es mehrfach gibt, wird nicht gespeichert (alter Wert bleibt, Fehler am Feld)
+        // Resolve group names to their DN with the new connection settings; a name
+        // that exists more than once is not stored (the old value stays, error on the field)
+        $groupErrors = [];
+        foreach (self::GROUP_KEYS as $key) {
+            $group = Directory::resolveGroups($data[$key] ?? null);
+            if ($group['error']) {
+                $groupErrors[$key] = $group['error'];
+                continue;
+            }
+            Setting::set($key, $group['value'] !== '' ? $group['value'] : null);
+        }
+
         // Firmenlogo hochladen bzw. entfernen
         // Upload or remove the company logo
         if ($request->boolean('remove_logo')) {
@@ -150,7 +203,9 @@ class SettingController extends Controller
         } elseif ($request->hasFile('logo')) {
             $this->deleteLogo();
             $file = $request->file('logo');
-            $name = 'uploads/logo-' . time() . '.' . strtolower($file->getClientOriginalExtension());
+            // Endung aus dem Inhalt, nie aus dem Dateinamen des Absenders (sonst z. B. „.html“)
+            // extension from the content, never from the sender's file name (otherwise e.g. ".html")
+            $name = 'uploads/logo-' . time() . '.' . self::imageExtension($file);
             $file->move(public_path('uploads'), basename($name));
             Setting::set('brand_logo_path', $name);
         }
@@ -160,6 +215,11 @@ class SettingController extends Controller
             'Einstellungen geändert',
             $this->user()['username'] ?? null,
         );
+
+        if ($groupErrors) {
+            return back()->withInput($request->except(['smtp_password', 'ldap_bind_password', 'logo']))->withErrors($groupErrors)
+                ->with('ok', __('Die übrigen Einstellungen sind gespeichert.'));
+        }
 
         return back()->with('ok', __('Einstellungen gespeichert.'));
     }
@@ -229,6 +289,36 @@ class SettingController extends Controller
         ActivityLog::write(ActivityLog::TYPE_SETTINGS, 'API-Token neu erzeugt', $this->user()['username'] ?? null);
 
         return back()->with('ok', __('Neues API-Token erzeugt und gespeichert.'));
+    }
+
+    /**
+     * Dateiendung eines geprüften Bildes aus seinem Inhalt (png, jpg, svg, webp)
+     *
+     * File extension of a validated image from its content (png, jpg, svg, webp)
+     */
+    public static function imageExtension(\Illuminate\Http\UploadedFile $file): string
+    {
+        $ext = strtolower((string) $file->guessExtension());
+        $ext = $ext === 'jpeg' ? 'jpg' : $ext;
+        abort_unless(in_array($ext, ['png', 'jpg', 'svg', 'webp'], true), 422);
+
+        return $ext;
+    }
+
+    /**
+     * Ist das SVG ein reines Bild? Abgelehnt werden Skripte, Ereignis-Attribute
+     * (onload …), javascript:-Adressen, Verweise nach außen (erlaubt: #id und
+     * eingebettete Rasterbilder data:image/…), eingebettetes HTML und
+     * XML-Entitäten.
+     *
+     * Is the SVG a plain image? Refused are scripts, event attributes
+     * (onload …), javascript: addresses, outside references (allowed: #id and
+     * embedded raster images data:image/…), embedded HTML and XML entities.
+     */
+    public static function svgIsPlain(string $svg): bool
+    {
+        return ! preg_match('/<\s*script|<\s*foreignObject|<!ENTITY|\son[a-z]+\s*=|javascript:'
+            . '|href\s*=\s*["\']\s*(?!#|data:image\/(?:png|jpe?g|gif|webp)[;,])|<\s*(?:iframe|embed|object)\b/i', $svg);
     }
 
     private function deleteLogo(): void

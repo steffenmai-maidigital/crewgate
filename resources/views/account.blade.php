@@ -3,6 +3,9 @@
 @section('content')
     <h1>{{ __('Mein Konto') }}</h1>
 
+    @if($mustChange)
+        <div class="flash err">{{ __('Ihr Passwort ist ein Startpasswort. Bitte vergeben Sie jetzt ein eigenes — vorher ist die Anwendung gesperrt.') }}</div>
+    @endif
     @if($mfaPending)
         <div class="flash err">{{ __('Für Ihre Gruppe ist die Zwei-Faktor-Anmeldung vorgeschrieben. Bitte richten Sie sie jetzt ein — vorher ist die Anwendung gesperrt.') }}</div>
     @endif
@@ -12,18 +15,6 @@
         @if($user->is_admin ?? false) · <span class="badge done">{{ __('Administrator') }}</span>@endif
         <div class="hint">{{ __('Benutzername') }}: <code>{{ $user->username }}</code> · {{ __('Herkunft') }}: {{ $user->origin() }}@if($user->email) · {{ $user->email }}@endif</div>
     </div>
-
-    @if(\App\Models\Setting::get('fox_enabled', '1') === '1')
-        <div class="panel">
-            <h2 style="margin-top:0">🦊 {{ __('Fuchs-Helfer') }}</h2>
-            <form method="post" action="{{ route('account.fox') }}" class="row" style="align-items:center">
-                @csrf
-                <p style="margin:0;flex:1 1 260px">{{ $user->showsFox() ? __('Der Fuchs unten rechts begrüßt Sie und gibt Tipps.') : __('Der Fuchs macht gerade Pause.') }}</p>
-                <input type="hidden" name="fox" value="{{ $user->showsFox() ? 0 : 1 }}">
-                <div style="flex:0"><button class="primary small" style="margin:0">{{ $user->showsFox() ? __('Fuchs ausblenden') : __('Fuchs anzeigen') }}</button></div>
-            </form>
-        </div>
-    @endif
 
     @if($user->isLocal())
         <div class="panel">
@@ -65,14 +56,14 @@
             <div class="row">
                 <form method="post" action="{{ route('account.2fa.codes') }}">
                     @csrf
-                    <label>{{ __('Neue Wiederherstellungscodes') }} <span class="hint">({{ $confirmation }})</span></label>
-                    <div class="row"><div><input type="password" name="password" required autocomplete="{{ $user->isLocal() ? 'current-password' : 'one-time-code' }}"></div><div style="flex:0"><button class="primary small" style="margin-top:.2rem">{{ __('Neu erzeugen') }}</button></div></div>
+                    <label for="codes-confirm">{{ __('Neue Wiederherstellungscodes') }} <span class="hint">({{ $confirmation }})</span></label>
+                    <div class="row"><div><input type="password" id="codes-confirm" name="password" required autocomplete="{{ $user->isLocal() ? 'current-password' : 'one-time-code' }}"></div><div style="flex:0"><button class="primary small" style="margin-top:.2rem">{{ __('Neu erzeugen') }}</button></div></div>
                 </form>
                 @if($policy !== \App\Support\Mfa::REQUIRED)
                     <form method="post" action="{{ route('account.2fa.disable') }}">
                         @csrf @method('DELETE')
-                        <label>{{ __('Ausschalten') }} <span class="hint">({{ $confirmation }})</span></label>
-                        <div class="row"><div><input type="password" name="password" required autocomplete="{{ $user->isLocal() ? 'current-password' : 'one-time-code' }}"></div><div style="flex:0"><button class="primary small danger" style="margin-top:.2rem">{{ __('Ausschalten') }}</button></div></div>
+                        <label for="disable-confirm">{{ __('Ausschalten') }} <span class="hint">({{ $confirmation }})</span></label>
+                        <div class="row"><div><input type="password" id="disable-confirm" name="password" required autocomplete="{{ $user->isLocal() ? 'current-password' : 'one-time-code' }}"></div><div style="flex:0"><button class="primary small danger" style="margin-top:.2rem">{{ __('Ausschalten') }}</button></div></div>
                     </form>
                 @else
                     <p class="hint">{{ __('Für Ihre Gruppe ist die Zwei-Faktor-Anmeldung vorgeschrieben und kann nicht ausgeschaltet werden.') }}</p>

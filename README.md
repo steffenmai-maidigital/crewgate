@@ -39,25 +39,24 @@ CrewGate macht daraus einen nachvollziehbaren Workflow:
 |---|---|
 | Prozessarten | Einstellung, Stellenwechsel, Austritt und Stammdatenänderung eingebaut; eigene Arten (z. B. „Azubi-Übernahme“) mit verkürztem Workflow — nicht beteiligte Abteilungen werden weder benachrichtigt noch müssen sie quittieren |
 | Workflow | Rollen mit Sortiernummer; Vorbereitung durch den Vorgesetzten mit Zwischenspeichern, danach Benachrichtigung der Abteilungen; Quittieren direkt aus der Aufgabenliste; HR-Abschluss; Workflow-Grafik auf Übersicht und Vorgangsseite |
-| Vorgesetzte | HR trägt den Vorgesetzten ein, seine Abteilung kommt aus dem AD (`department`); er sieht alle Vorgänge seiner Abteilung und darf die Schritte aller Abteilungen ausfüllen |
+| Vorgesetzte | HR trägt den Vorgesetzten ein, seine Abteilung kommt aus dem AD (`department`) oder seinem CrewGate-Konto; er sieht seine Vorgänge vollständig und füllt in der Vorbereitung die Schritte aller Abteilungen aus. Kollegen derselben Abteilung sehen nur die Kopfdaten |
 | Felder | je Rolle und Prozess: Auswahl, Mehrfachauswahl, Checkbox, Datum, Produktauswahl und Freitext mit Regex; Felder der HR-Anlage; „für alle Abteilungen sichtbar“ |
 | Produktkatalog | Produkte mit Bild, Preis, Artikel- und Herstellernummer; Kategorien mit Farbe und Reihenfolge; Pflege durch die zuständige Rolle selbst |
-| Sichtbarkeit | je Rolle „Sieht Daten von“; HR, Admins, Auditoren und Vorgesetzte sehen den ganzen Vorgang |
+| Sichtbarkeit | je Rolle „Sieht Daten von“; HR, Admins, Auditoren und Vorgesetzte sehen den ganzen Vorgang; Konten ohne Bezug zum Vorgang bekommen keinen Zugriff |
 | E-Mails | Text-Mail an die zentrale Adresse der nächsten Rolle mit den für sie sichtbaren Daten; nie Direktlinks, nur ein pauschaler Portal-Link; Vorlagen DE/EN anpassbar; Mail-Log mit Volltext und Status |
 | Fristen | Erledigungsdatum für Vorgesetzte und Abteilungen, automatische Erinnerungen |
 | Massenimport | CSV-Import für viele Vorgänge auf einmal (z. B. Ausbildungsjahrgang) |
-| API v2 | Vorgänge anlegen, Status und Werte abrufen — für HR- und ITSM-Systeme ([docs/API.md](docs/API.md)) |
+| API v2 | Vorgänge anlegen (geprüft wie das Formular), Status und Werte abrufen — für HR- und ITSM-Systeme ([docs/API.md](docs/API.md)) |
 | Protokoll | wer wann was ausgefüllt, quittiert, verschickt oder geändert hat; Hash-Kette; CSV- und PDF-Export; Rolle „Auditor“ mit reinem Lesezugriff |
 | Löschung | per Schalter, Frist 1–120 Monate nach Abschluss, täglich um 02:00 Uhr; jede Löschung wird protokolliert |
-| Sprachen | Deutsch und Englisch, Umschalter mit Flaggen; englische Bezeichnungen für Felder, Produkte und Kategorien; Mails und Exporte zweisprachig |
+| Sprachen | Deutsch und Englisch, Umschalter mit Flaggen; englische Bezeichnungen für Felder, Produkte, Kategorien, Prozesse und Rollen; Mails und Exporte zweisprachig |
 | Gestaltung | Firmenname, Logo, Header-, Akzent- und Footer-Farbe, Footer-Text; Glas-Design, hell und dunkel |
 | Impressum und Datenschutz | einzeln einschaltbar, als eigener Text oder Link auf die Firmen-Homepage; ohne Anmeldung erreichbar, mit Vorlage für die Datenschutzhinweise |
 | Hilfe | Version, Lizenz, Handbücher und Änderungshistorie direkt in der Anwendung (Footer → **Hilfe**) |
-| Anmeldung | eigene Konten (Menü **Benutzer**) immer; Verzeichnis optional (Active Directory, Samba AD, OpenLDAP, Univention) mit „Verbindung testen“; Gruppen als DN oder Name, verschachtelte AD-Gruppen; Notzugang per `php artisan crewgate:admin-password` |
+| Anmeldung | eigene Konten (Menü **Benutzer**) immer; Verzeichnis optional (Active Directory, Samba AD, OpenLDAP, Univention) mit „Verbindung testen“; Gruppen als DN oder Name (Name wird beim Speichern eindeutig zum DN), verschachtelte AD-Gruppen; Startpasswörter müssen geändert werden; Notzugang per `php artisan crewgate:admin-password` (auch `--disable-2fa`) |
 | Zwei-Faktor | TOTP mit Authenticator-App; je Gruppe Pflicht, wählbar oder aus, Verzeichnisgruppen mit Pflicht, Ausnahme je Benutzer; Wiederherstellungscodes; Zurücksetzen durch Administratoren |
-| Fuchs-Helfer | Rua, der Fuchs (Wikinger-Fuchs aus einem norwegischen Fjord, Name aus Irland), duzt; begrüßt, gibt Tipps passend zu Rolle und Seite, wirbt auf der Anmeldeseite für freie Software; zentral und je Person abschaltbar |
-| Betrieb | Docker, SQLite, nächtliche Sicherung mit Prüfsumme, sicheres Update mit Downgrade-Schutz, Testsystem-Kennzeichnung (`TEST_MODE`), Demo-Modus ohne Verzeichnis |
-| Sicherheit | Sicherheits-Header (CSP, HSTS), Bremse gegen Passwort-Raten, Proxy-Angaben nur aus internen Netzen |
+| Betrieb | Docker, SQLite, nächtliche Sicherung mit Prüfsumme und Schlüssel, sicheres Update mit Downgrade-Schutz, Testsystem-Kennzeichnung (`TEST_MODE`), Demo-Modus ohne Verzeichnis |
+| Sicherheit | Sicherheits-Header (CSP, HSTS), Bremse gegen Passwort-Raten, Proxy-Angaben nur aus internen Netzen; Sperren beendet laufende Sitzungen sofort, ein neues Passwort die übrigen; Uploads nur als Bild ausgeliefert; CSV-Export mit Formelschutz |
 
 ## Rollen
 
@@ -94,10 +93,11 @@ mkdir -p backups
 docker compose up -d --build
 ```
 
-Danach ist CrewGate unter <http://localhost:7101> erreichbar. Im
-Auslieferungszustand läuft der **Demo-Modus** (`DEMO_MODE: "true"`): acht
-Demo-Konten mit Beispielvorgängen, kein Verzeichnis nötig, E-Mails landen im
-Protokoll statt beim Mailserver.
+Danach ist CrewGate unter <http://localhost:7101> erreichbar, im
+Normalbetrieb (siehe unten). Zum Ausprobieren gibt es den **Demo-Modus**: in
+`docker-compose.yml` `DEMO_MODE: "true"` setzen. Dann gibt es acht Demo-Konten
+mit Beispielvorgängen, kein Verzeichnis ist nötig, E-Mails landen im Protokoll
+statt beim Mailserver.
 
 | Konto | Passwort | Rolle |
 |---|---|---|
@@ -105,6 +105,7 @@ Protokoll statt beim Mailserver.
 | `max.admin` | `demo` | Admin |
 | `petra.chef` | `demo` | Vorgesetzte (Vertrieb) |
 | `karl.chef` | `demo` | Vorgesetzter (Produktion) |
+| `rita.audit` | `demo` | Auditor (liest Vorgänge und Protokoll) |
 | `tim.it` | `demo` | Abteilung IT |
 | `eva.einkauf` | `demo` | Abteilung Einkauf |
 | `frank.facility` | `demo` | Abteilung Facility |
@@ -114,12 +115,19 @@ Demodaten neu aufbauen: `docker exec crewgate php artisan demo:seed --fresh`
 
 ### Normalbetrieb
 
-1. In `docker-compose.yml` `DEMO_MODE: "false"` setzen. Eine `.env` ist nicht
-   nötig. Beim ersten Start legt CrewGate den Administrator `admin` als
+1. `DEMO_MODE` bleibt auf `"false"` (Auslieferungszustand). Eine `.env` ist
+   nicht nötig. Beim ersten Start legt CrewGate den Administrator `admin` als
    eigenes Konto an; das Startpasswort steht im Container-Protokoll
    (`docker compose logs app`) oder wird vorher als `ADMIN_PASSWORD` gesetzt.
-2. Als `admin` anmelden → **Benutzer**: eigenes Passwort vergeben, weitere
-   Konten anlegen (HR, Abteilungen, Vorgesetzte) — oder unter
+   Lief vorher der Demo-Modus auf denselben Volumes, bekommen die Demo-Konten
+   beim ersten Start im Normalbetrieb neue Startpasswörter (ebenfalls im
+   Container-Protokoll, z. B. für `max.admin`); Demo-Konten ohne Admin-Recht
+   werden gesperrt. Sauberer ist ein Start mit leerer Datenbank
+   ([installation/docker.md](installation/docker.md), `FRESH_DB`).
+2. Als `admin` anmelden: Ein Startpasswort aus dem Protokoll muss zuerst
+   unter **Mein Konto** durch ein eigenes ersetzt werden. Dann unter
+   **Benutzer** weitere Konten anlegen (HR, Abteilungen, Vorgesetzte; auch sie
+   ändern ihr Startpasswort bei der ersten Anmeldung) — oder unter
    **Einstellungen → 3 · Anmeldung** das Verzeichnis (Active Directory,
    Samba AD, OpenLDAP, Univention) eintragen, speichern und „Verbindung
    testen“. Danach meldet sich jeder Mitarbeiter mit seinem Firmenkonto an;
@@ -133,7 +141,9 @@ Demodaten neu aufbauen: `docker exec crewgate php artisan demo:seed --fresh`
 6. Als HR den ersten Vorgang anlegen.
 
 Niemand ausgesperrt: `docker exec crewgate php artisan crewgate:admin-password`
-legt jederzeit ein eigenes Admin-Konto an oder setzt dessen Passwort neu.
+legt jederzeit ein eigenes Admin-Konto an oder setzt dessen Passwort neu (ein
+Startpasswort); `--disable-2fa` setzt zusätzlich die Zwei-Faktor-Anmeldung
+dieses Kontos zurück.
 
 Den Schlüssel `APP_KEY` erzeugt CrewGate beim ersten Start selbst und legt ihn
 unter `/data/.app_key` ab. Schritt für Schritt: [installation/docker.md](installation/docker.md).
@@ -167,9 +177,11 @@ Start in der Oberfläche gepflegt; die Werte dort haben Vorrang.
 
 ### Daten und Sicherung
 
-- `./backups` (Ordner, vor dem ersten Start anlegen): jede Nacht um 02:30 Uhr
-  ein ZIP mit Datenbank und Uploads samt SHA-256-Prüfsumme; Sicherungen von
-  Hand („Jetzt sichern“ unter **Einstellungen**) unter `./backups/manual`
+- `./backups` (Ordner, vor dem ersten Start anlegen, nur für Administratoren):
+  jede Nacht um 02:30 Uhr ein ZIP mit Datenbank, Schlüssel `.app_key` und
+  Uploads samt SHA-256-Prüfsumme; Sicherungen von Hand („Jetzt sichern“ unter
+  **Einstellungen**) unter `./backups/manual`. Mit dem Schlüssel sind
+  Servicekonto-Passwort und Zwei-Faktor-Geheimnisse nach einem Umzug lesbar.
 - `app-data` (Volume): Datenbank `database.sqlite`, Schlüssel `.app_key` und
   die Sicherungen vor jedem Update unter `/data/backups/` (die 10 neuesten bleiben)
 - `app-storage` (Volume): Sitzungen, Protokolle, Zwischenspeicher
@@ -253,7 +265,7 @@ app/Models            Onboarding (Vorgang), OnboardingStep, OnboardingValue, Rol
                       CustomField, Process, Product, ProductCategory, ActivityLog, MailLog, Setting
 app/Services          WorkflowService (Statusmaschine), LdapService (Benutzersuche, Gruppen),
                       DemoDirectory, MailService, ReportService (PDF), UpgradeService, LicenseService
-app/Support           Directory (LDAP-Anbindung, gemeinsamer Baustein), Fox, ProductInfo, LegalPages, ErrorPage, Mfa
+app/Support           Directory (LDAP-Anbindung, gemeinsamer Baustein), ProductInfo, LegalPages, ErrorPage, Mfa
 app/Http/Controllers  Vorgänge, Rollen, Felder, Produkte, Einstellungen, Protokoll, API v2
 app/Console/Commands  purge, ad:sync-groups, reminders:send, audit:report, demo:seed, app:upgrade
 resources/views       Blade-Oberfläche, eine Stylesheet-Datei unter public/css/app.css

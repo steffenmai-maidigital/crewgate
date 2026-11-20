@@ -14,11 +14,11 @@ each command with `sudo`. The examples assume the Compose project is called
 | volume `crewgate_app-data` (`/data`) | database `database.sqlite`, key `.app_key`, backups taken before every update under `backups/` |
 | volume `crewgate_app-storage` | sessions, cache, logs |
 | volume `crewgate_app-uploads` | company logo and product images |
-| folder `./backups` | nightly backups; `manual/` for backups created by hand |
+| folder `./backups` | nightly backups; `manual/` for backups created by hand; each one also contains `.app_key` |
 | `docker-compose.yml` | all settings, including AD credentials and SMTP |
 
 The Compose file contains credentials. Back it up, but do not keep it in a
-folder that many people can read. The database and backups contain personnel data – only give administrators access to the `backups` folder.
+folder that many people can read. The database and backups contain personnel data – only give administrators access to the `backups` folder. CrewGate creates the ZIP files without read access for others (`0640`); use `sudo` to check or copy them on the host.
 
 ## Update
 
@@ -85,14 +85,26 @@ So do not delete old images too early (`docker image prune -a` removes them).
 ## Backups
 
 - **Automatic:** every night at 2:30 the `crewgate-scheduler` container
-  stores a ZIP with the database and uploads, plus a SHA-256 checksum, in
-  `./backups`. They are kept for `BACKUP_KEEP_DAYS` days (default 14, at least 4).
+  stores a ZIP with the database, the key `.app_key` and uploads, plus a
+  SHA-256 checksum, in `./backups`. They are kept for `BACKUP_KEEP_DAYS` days
+  (default 14, at least 4).
 - **Right now, in the browser:** as administrator under **Settings →
   Backup → Back up now**. These backups are stored in `./backups/manual` and are
   never deleted automatically.
 - **Keep a copy elsewhere:** regularly copy the `backups` folder and
   `docker-compose.yml` to a second device, on Synology e.g. with
-  **Hyper Backup**.
+  **Hyper Backup**; encrypt the target or share it with administrators only.
+- There is no download of the backups in the browser; they stay on the server.
+
+A backup contains `database/database.sqlite` (consistent copy, even while
+running), `.app_key` and the folder `uploads/` (logo, product images).
+
+**`.app_key` matters:** it encrypts the service account password and the
+two-factor secrets. Every backup contains it so that a restore on new hardware
+is complete. Whoever can read a backup can decrypt these details as well – make
+the `backups` folder accessible to administrators only. If `APP_KEY` is set in
+`docker-compose.yml`, there is no `.app_key` file; then back up the Compose file
+as well.
 
 To check a backup:
 
@@ -114,13 +126,19 @@ docker run --rm -v crewgate_app-data:/data -v crewgate_app-uploads:/uploads \
   set -e; mkdir /tmp/r && cd /tmp/r && unzip -q /backups/FILE.zip
   rm -f /data/database.sqlite /data/database.sqlite-wal /data/database.sqlite-shm
   cp database/database.sqlite /data/database.sqlite
+  if [ -f .app_key ]; then cp .app_key /data/.app_key && chmod 600 /data/.app_key; fi
   if [ -d uploads ]; then cp -r uploads/. /uploads/; fi
   echo restored"
 
 docker compose start
 ```
 
-CrewGate fixes the file permissions itself on start.
+CrewGate fixes the file permissions itself on start. With the key from the
+backup, the service account password and two-factor sign-ins work again at
+once; all users sign in once more. Older backups without `.app_key` restore the
+data as well; then enter the service account password again under
+**Settings → Sign-in**, and two-factor users need “Reset two-factor” under
+**Users**.
 
 **Moving to another server:** set up CrewGate there as described in the
 installation guide (same `docker-compose.yml`), start it once and then run the
@@ -149,8 +167,26 @@ above – but change the outgoing mail settings first.
 
 ### No administrator can get in
 
-The administrators group is set under **Settings**, otherwise in
-`AD_GROUP_ADMIN`. Check that the account is a **direct** member of that group
+Create an own admin account or set its password anew (emergency access):
+
+```bash
+docker exec crewgate php artisan crewgate:admin-password admin
+```
+
+The command prints an initial password; a new one must be chosen at sign-in,
+running sessions of this account end. If the account is missing, the command
+creates it. If the phone with the authenticator app is gone, `--disable-2fa`
+also resets the two-factor sign-in of this account:
+
+```bash
+docker exec crewgate php artisan crewgate:admin-password admin --disable-2fa
+```
+
+If two-factor sign-in is mandatory for administrators, it is set up again after
+signing in. Every call is recorded in the audit log.
+
+For directory accounts: the administrators group is set under **Settings**,
+otherwise in `AD_GROUP_ADMIN`. Check that the account is a **direct** member of that group
 (enter the full DN, e.g. `CN=CrewGate-Admins,OU=Groups,DC=example,DC=local`). `LDAP_LOGGING: "true"` shows the LDAP messages in the
 log (`docker compose logs -f app`).
 
@@ -194,6 +230,7 @@ Each prefixed with `docker exec crewgate`:
 | Command | Purpose |
 |---|---|
 | `php artisan app:upgrade` | run the version check and migrations by hand |
+| `php artisan crewgate:admin-password [name] [--disable-2fa]` | emergency access: own admin account with an initial password, optionally without two-factor |
 | `php artisan schedule:list` | show scheduled tasks and their next run |
 | `php artisan cache:clear` | clear the cache (also lifts login locks) |
 | `php artisan ad:sync-groups` | sync roles with the AD groups now |

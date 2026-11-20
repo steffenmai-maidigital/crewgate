@@ -4,19 +4,19 @@
     <h1>{{ __('Mail-Log (ausgehende E-Mails)') }}</h1>
 
     <div class="panel">
-        <table>
+        <table class="cards">
             <tr><th style="width:145px">{{ __('Zeitpunkt') }}</th><th>{{ __('Empfänger') }}</th><th>{{ __('Betreff') }}</th><th style="width:110px">{{ __('Status') }}</th></tr>
             @forelse($logs as $log)
                 <tr>
-                    <td>{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
-                    <td>{{ $log->recipient }}</td>
-                    <td>
+                    <td data-label="{{ __('Zeitpunkt') }}">{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
+                    <td data-label="{{ __('Empfänger') }}">{{ $log->recipient }}</td>
+                    <td data-label="{{ __('Betreff') }}">
                         <details>
                             <summary style="cursor:pointer">{{ $log->subject }}</summary>
                             <pre style="white-space:pre-wrap;font:inherit;background:var(--chip);padding:.7rem .9rem;border-radius:10px;margin:.5rem 0 0">{{ $log->body }}</pre>
                         </details>
                     </td>
-                    <td>
+                    <td data-label="{{ __('Status') }}">
                         <span class="badge {{ $log->status === \App\Models\MailLog::STATUS_SENT ? 'done' : 'open' }}">{{ $log->statusLabel() }}</span>
                         @if($log->error)<div class="hint">{{ $log->error }}</div>@endif
                     </td>
@@ -26,10 +26,10 @@
             @endforelse
         </table>
         <div style="margin-top:.8rem">
-            @if(!$logs->onFirstPage())<a href="{{ $logs->previousPageUrl() }}">&larr; Neuere</a>@endif
-            @if($logs->hasMorePages())<a href="{{ $logs->nextPageUrl() }}" style="margin-left:1rem">Ältere &rarr;</a>@endif
-            <span class="hint" style="margin-left:1rem">Seite {{ $logs->currentPage() }}</span>
+            @if(!$logs->onFirstPage())<a href="{{ $logs->previousPageUrl() }}">&larr; {{ __('Neuere') }}</a>@endif
+            @if($logs->hasMorePages())<a href="{{ $logs->nextPageUrl() }}" style="margin-left:1rem">{{ __('Ältere') }} &rarr;</a>@endif
+            <span class="hint" style="margin-left:1rem">{{ __('Seite') }} {{ $logs->currentPage() }}</span>
         </div>
-        <p class="hint">Auf den Betreff klicken, um den vollständigen Nachrichtentext zu sehen. Im Demo-Modus werden Mails nicht wirklich zugestellt, aber hier protokolliert.</p>
+        <p class="hint">{{ __('Auf den Betreff klicken, um den vollständigen Nachrichtentext zu sehen. Im Demo-Modus werden Mails nicht wirklich zugestellt, aber hier protokolliert.') }}</p>
     </div>
 @endsection

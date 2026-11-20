@@ -57,7 +57,7 @@ class SendDueReminders extends Command
                     ->filter(fn ($f) => blank($stored[$f->id] ?? null))
                     ->map(fn ($f) => $f->bilingualLabel());
                 if ($missing->isNotEmpty()) {
-                    $lines[] = $role->name . ': ' . $missing->implode(', ');
+                    $lines[] = $role->bilingualName() . ': ' . $missing->implode(', ');
                 }
             }
             $openText = $lines === []
@@ -100,7 +100,7 @@ class SendDueReminders extends Command
                         continue;
                     }
 
-                    $subject = 'Erinnerung / Reminder: ' . $o->processLabel() . ' – ' . $o->fullName() . ' – Quittierung ausstehend für ' . $role->name;
+                    $subject = 'Erinnerung / Reminder: ' . $o->processLabel() . ' – ' . $o->fullName() . ' – Quittierung ausstehend für ' . $role->bilingualName();
 
                     $vars = [
                         'role' => $role->name,
@@ -114,7 +114,8 @@ class SendDueReminders extends Command
                     ];
                     $body = MailService::renderTemplate('mail_tpl_reminder_role_de', MailService::REMINDER_ROLE_TEMPLATE_DE, $vars)
                         . "\n\n----------------------------------------\n\n"
-                        . MailService::renderTemplate('mail_tpl_reminder_role_en', MailService::REMINDER_ROLE_TEMPLATE_EN, $vars);
+                        // englischer Teil mit dem englischen Rollennamen / English part with the English role name
+                        . MailService::renderTemplate('mail_tpl_reminder_role_en', MailService::REMINDER_ROLE_TEMPLATE_EN, ['role' => $role->englishName()] + $vars);
 
                     MailService::sendText($role->central_email, $subject, $body, $o);
                 }

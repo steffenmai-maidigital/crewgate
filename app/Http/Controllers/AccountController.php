@@ -13,11 +13,13 @@ use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Eigenes Konto: Passwort (eigene Konten), Zwei-Faktor-Anmeldung, Fuchs-Helfer
+ * Eigenes Konto: Passwort (eigene Konten), Zwei-Faktor-Anmeldung
  *
- * Own account: password (own accounts), two-factor sign-in, fox helper
+ * Own account: password (own accounts), two-factor sign-in
  */
 class AccountController extends Controller
 {
@@ -45,6 +47,7 @@ class AccountController extends Controller
             'codes'      => $request->session()->get('2fa.codes'),
             'policy'     => $this->user()['mfa'] ?? Mfa::policy($user),
             'mfaPending' => (bool) ($this->user()['mfa_pending'] ?? false),
+            'mustChange' => $user->mustChangePassword(),
         ]);
     }
 
@@ -62,10 +65,16 @@ class AccountController extends Controller
         if (Hash::check($data['password'], $user->password)) {
             return back()->withErrors(['password' => __('Bitte ein neues Passwort wählen.')]);
         }
-        $user->forceFill(['password' => $data['password']])->save();
+        $user->forceFill(['password' => $data['password'], 'must_change_password' => false])->save();
+        // Alle anderen Sitzungen dieses Kontos enden (Fingerabdruck passt nicht
+        // mehr); die laufende bleibt: neuen Fingerabdruck übernehmen, neue Sitzungs-ID
+        // All other sessions of this account end (the fingerprint no longer
+        // matches); the running one stays: take over the new fingerprint, new session ID
+        $request->session()->put('ldap_user.password_fingerprint', $user->passwordFingerprint());
+        $request->session()->regenerate();
         ActivityLog::write(ActivityLog::TYPE_USER, 'Eigenes Passwort geändert', $user->username);
 
-        return redirect()->route('account')->with('ok', __('Passwort geändert.'));
+        return redirect()->route('account')->with('ok', __('Passwort geändert. Andere Anmeldungen mit diesem Konto sind beendet.'));
     }
 
     public function startTwoFactor(Request $request)
@@ -78,6 +87,8 @@ class AccountController extends Controller
 
     public function confirmTwoFactor(Request $request)
     {
+        // wie beim Start: bei Stufe „aus“ keine Einrichtung / as at the start: no set-up at level "off"
+        abort_unless(($this->user()['mfa'] ?? Mfa::OPTIONAL) !== Mfa::OFF, 403, 'Zwei-Faktor ist für diese Gruppe ausgeschaltet.');
         $request->validate(['code' => ['required', 'string', 'max:10']]);
         $secret = $request->session()->get('2fa.secret');
         $step = $secret ? Totp::verify($secret, preg_replace('/\s+/', '', $request->input('code'))) : null;
@@ -125,15 +136,6 @@ class AccountController extends Controller
         return redirect()->route('account')->with('ok', __('Zwei-Faktor-Anmeldung ist ausgeschaltet.'));
     }
 
-    /** Fuchs-Helfer für sich selbst ein- oder ausschalten / Switch the fox helper on or off for oneself */
-    public function fox(Request $request)
-    {
-        $on = $request->boolean('fox');
-        $this->account()->forceFill(['fox' => $on])->save();
-
-        return back()->with('ok', $on ? __('Der Fuchs ist wieder da.') : __('Der Fuchs macht Pause.'));
-    }
-
     /**
      * Bestätigung sicherheitsrelevanter Schritte: eigene Konten mit Passwort,
      * Verzeichniskonten mit einem aktuellen Code der Authenticator-App.
@@ -143,11 +145,32 @@ class AccountController extends Controller
      */
     private function passwordOk(Request $request, User $user): bool
     {
-        $input = (string) $request->input('password', '');
-        if ($user->isLocal()) {
-            return $user->password && Hash::check($input, $user->password);
+        // Bremse wie beim Code der Anmeldung: 5 Fehlversuche je Konto, dann 5 Minuten Pause
+        // Throttle like the sign-in code: 5 failed attempts per account, then a 5-minute pause
+        $key = 'account-confirm:' . $user->id;
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            throw ValidationException::withMessages(['password' => __('Zu viele Fehlversuche. Bitte in :minuten Minuten erneut versuchen.', [
+                'minuten' => (int) ceil(RateLimiter::availableIn($key) / 60),
+            ])]);
         }
 
-        return $user->hasTwoFactor() && Totp::verify($user->two_factor_secret, preg_replace('/\s+/', '', $input)) !== null;
+        $input = (string) $request->input('password', '');
+        if ($user->isLocal()) {
+            $ok = $user->password && Hash::check($input, $user->password);
+        } else {
+            // Ein Code der Authenticator-App gilt nur einmal (last_step wie bei der Anmeldung)
+            // A code from the authenticator app is valid only once (last_step as at sign-in)
+            $step = $user->hasTwoFactor()
+                ? Totp::verify($user->two_factor_secret, (string) preg_replace('/\s+/', '', $input), $user->two_factor_last_step)
+                : null;
+            $ok = $step !== null;
+            if ($ok) {
+                $user->forceFill(['two_factor_last_step' => $step])->save();
+            }
+        }
+
+        $ok ? RateLimiter::clear($key) : RateLimiter::hit($key, 300);
+
+        return $ok;
     }
 }

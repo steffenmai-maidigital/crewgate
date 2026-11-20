@@ -5,6 +5,6 @@
 // Version of CrewGate in the scheme YYMMDDNN (date + running number of the day)
 // and build timestamp YYMMDDHHMM. Set when publishing.
 return [
-    'number' => '26101802',
-    'build'  => '2610181505',
+    'number' => '26112001',
+    'build'  => '2611202335',
 ];

@@ -31,18 +31,21 @@ class SeedDemoData extends Command
         $ldap->syncGroupsToRoles();
         \App\Services\DemoDirectory::seedUsers();
 
-        // Zentrale Adressen und Reihenfolge pflegen
-        // Maintain central addresses and order
+        // Zentrale Adressen, Reihenfolge und englische Namen pflegen (einen
+        // selbst gepflegten englischen Namen nicht überschreiben)
+        // Maintain central addresses, order and English names (do not
+        // overwrite an English name maintained by hand)
         foreach ([
-            'IT'       => ['sort' => 1, 'mail' => 'it-onboarding@demo.local'],
-            'Einkauf'  => ['sort' => 2, 'mail' => 'einkauf-onboarding@demo.local'],
-            'Facility' => ['sort' => 3, 'mail' => 'facility-onboarding@demo.local'],
+            'IT'       => ['sort' => 1, 'mail' => 'it-onboarding@demo.local', 'en' => 'IT'],
+            'Einkauf'  => ['sort' => 2, 'mail' => 'einkauf-onboarding@demo.local', 'en' => 'Purchasing'],
+            'Facility' => ['sort' => 3, 'mail' => 'facility-onboarding@demo.local', 'en' => 'Facility management'],
         ] as $name => $cfg) {
             Role::where('name', $name)->update([
                 'sort_order'    => $cfg['sort'],
                 'central_email' => $cfg['mail'],
                 'in_workflow'   => true,
             ]);
+            Role::where('name', $name)->whereNull('name_en')->update(['name_en' => $cfg['en']]);
         }
 
         // Beispiel-Felder für die HR-Anlage (erscheinen beim Anlegen des Vorgangs)

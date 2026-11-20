@@ -13,9 +13,35 @@ Authorization: Bearer <Token>      (alternativ: X-Api-Token: <Token>)
 
 | Endpunkt | Zweck |
 |---|---|
-| `POST /api/v2/cases` | Vorgang anlegen (JSON: `process`, `first_name`, `last_name`, `supervisor_username`, optional `start_date`, `supervisor_due_date`, `roles_due_date`, `notes`, `fields` als `{field_id: value}`). Der Vorgang startet wie gewohnt in der Vorbereitung, die Vorgesetzten-Mail geht sofort raus |
+| `POST /api/v2/cases` | Vorgang anlegen (JSON: `process`, `first_name`, `last_name`, `supervisor_username`, optional `start_date`, `supervisor_due_date`, `roles_due_date`, `notes`, `fields` als `{field_id: value}` oder `{"Bezeichnung": value}`). Der Vorgang startet wie gewohnt in der Vorbereitung, die Vorgesetzten-Mail geht sofort raus |
 | `GET /api/v2/cases` | Statusliste (Filter `?status=draft|open|review|done|cancelled`, `?process=<key>`) |
-| `GET /api/v2/cases/{id}` | Einzelstatus inkl. Quittierungen (wer/wann), ausstehender Abteilungen und **aller gepflegten Werte** (Feld, Abteilung, Wert, Anzeigewert) |
+| `GET /api/v2/cases/{id}` | Einzelstatus inkl. Quittierungen (wer/wann), ausstehender Abteilungen und **aller gepflegten Werte** (Feld, Abteilung, Wert, Anzeigewert); Abteilungen mit `role` und `role_en` (englischer Name, leer = nicht gepflegt) |
+
+**Prüfung beim Anlegen** wie im Formular **Neuer Vorgang**:
+
+- `process` muss ein **aktiver** Prozess sein.
+- Die Anlage-Felder des Prozesses (Rolle „HR (Anlage des Vorgangs)“, Ausfüllen
+  bei der Anlage) werden geprüft: Pflichtfelder, Format (regulärer Ausdruck mit
+  Hinweistext), Auswahl- und Mehrfachauswahl-Optionen, Datum, Produkte.
+  Freitext höchstens 2000 Zeichen.
+- `fields` nimmt die Feld-ID oder die deutsche Bezeichnung als Schlüssel.
+  Felder anderer Prozesse oder Abteilungen werden ignoriert.
+- Bei Fehlern kommt **422** mit einer Liste je Feld, immer als JSON (auch ohne
+  `Accept: application/json`):
+
+```json
+{
+  "message": "Stellenbezeichnung ist ein Pflichtfeld. (and 1 more error)",
+  "errors": {
+    "fields.1": ["Stellenbezeichnung ist ein Pflichtfeld."],
+    "fields.3": ["Personalnummer: Format: P-12345"]
+  }
+}
+```
+
+Ein regulärer Ausdruck, der für eine Eingabe zu aufwendig wird, bricht nach
+kurzer Zeit ab; das Feld bekommt dann eine Fehlermeldung statt den Server
+lange zu beschäftigen.
 
 **Alte Adressen:** `/api/v2/vorgaenge` und `/api/v2/vorgaenge/{id}` gelten
 weiter, gleichwertig zu `/api/v2/cases` (keine Weiterleitung, auch `POST`).

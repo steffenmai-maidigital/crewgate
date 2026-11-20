@@ -10,7 +10,7 @@
                 <div>
                     <select id="role" name="role" onchange="this.form.submit()">
                         @foreach($roles as $r)
-                            <option value="{{ $r->id }}" @selected($role && $role->id === $r->id)>{{ $r->name }}</option>
+                            <option value="{{ $r->id }}" @selected($role && $role->id === $r->id)>{{ $r->displayName() }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -20,73 +20,73 @@
 
     @if($role)
         <div class="panel">
-            <h2 style="margin-top:0">Felder für „{{ $role->name }}“</h2>
-            <table class="manage">
-                <tr><th>{{ __('Reihenfolge') }}</th><th>{{ __('Bezeichnung') }}</th><th>{{ __('Typ') }}</th><th>{{ __('Optionen / Regex') }}</th><th>{{ __('Pflicht') }}</th><th>{{ __('Aktiv') }}</th><th></th></tr>
+            <h2 style="margin-top:0">{{ __('Felder für „:name“', ['name' => $role->displayName()]) }}</h2>
+            <table class="manage cards">
+                <tr><th>{{ __('Reihenfolge') }}</th><th>{{ __('Bezeichnung') }}</th><th>{{ __('Typ') }}</th><th>{{ __('Optionen / Regex') }}</th><th>{{ __('Pflicht') }}</th><th>{{ __('Aktiv') }}</th><th><span class="sr-only">{{ __('Aktionen') }}</span></th></tr>
                 @forelse($fields as $field)
                     <tr>
                         <form method="post" action="{{ route('admin.fields.update', $field) }}">
                             @csrf @method('PUT')
                             <input type="hidden" name="role_id" value="{{ $role->id }}">
                             <input type="hidden" name="type" value="{{ $field->type }}">
-                            <td style="width:80px"><input type="number" name="sort_order" value="{{ $field->sort_order }}" min="0"></td>
-                            <td>
-                                <input type="text" name="label" value="{{ $field->label }}">
-                                <input type="text" name="label_en" value="{{ $field->label_en }}" placeholder="{{ __('Bezeichnung (EN, optional)') }}" style="margin-top:.3rem">
-                                <div class="proc-checks">
+                            <td style="width:80px" data-label="{{ __('Reihenfolge') }}"><input type="number" name="sort_order" value="{{ $field->sort_order }}" min="0" aria-label="{{ __('Reihenfolge') }}"></td>
+                            <td data-label="{{ __('Bezeichnung') }}">
+                                <input type="text" name="label" value="{{ $field->label }}" aria-label="{{ __('Bezeichnung') }}">
+                                <input type="text" name="label_en" value="{{ $field->label_en }}" placeholder="{{ __('Bezeichnung (EN, optional)') }}" aria-label="{{ __('Bezeichnung (EN, optional)') }}" style="margin-top:.3rem">
+                                <div class="proc-checks" role="group" aria-label="{{ __('Prozesse') }}">
                                     @foreach(\App\Models\Process::orderBy('sort_order')->get() as $proc)
                                         <label class="choice"><input type="checkbox" name="processes[]" value="{{ $proc->key }}" @checked(in_array($proc->key, $field->processes ?? array_keys(\App\Models\Onboarding::PROCESSES)))> {{ $proc->displayName() }}</label>
                                     @endforeach
                                 </div>
                                 @if($role->is_intake)
-                                    <select name="fill_stage" style="margin-top:.3rem">
+                                    <select name="fill_stage" style="margin-top:.3rem" aria-label="{{ __('Ausfüllen bei') }}">
                                         <option value="intake" @selected(($field->fill_stage ?? 'intake') === 'intake')>{{ __('Ausfüllen: HR bei der Anlage') }}</option>
                                         <option value="preparation" @selected($field->fill_stage === 'preparation')>{{ __('Ausfüllen: Vorgesetzter in der Vorbereitung') }}</option>
                                     </select>
                                     <label class="choice" style="margin-top:.3rem"><input type="checkbox" name="visible_to_all" value="1" @checked($field->visible_to_all)> {{ __('Für alle Abteilungen sichtbar') }}</label>
                                 @endif
                             </td>
-                            <td>{{ __(\App\Models\CustomField::TYPES[$field->type] ?? $field->type) }}</td>
-                            <td>
+                            <td data-label="{{ __('Typ') }}">{{ __(\App\Models\CustomField::TYPES[$field->type] ?? $field->type) }}</td>
+                            <td data-label="{{ __('Optionen / Regex') }}">
                                 @if(in_array($field->type, ['select', 'multiselect']))
-                                    <textarea name="options_raw" rows="2" placeholder="eine Option pro Zeile">{{ implode("\n", $field->options ?? []) }}</textarea>
+                                    <textarea name="options_raw" rows="2" placeholder="{{ __('eine Option pro Zeile') }}" aria-label="{{ __('Optionen (eine pro Zeile)') }}">{{ implode("\n", $field->options ?? []) }}</textarea>
                                 @elseif($field->type === 'text')
-                                    <input type="text" name="regex" value="{{ $field->regex }}" placeholder="^[A-Z]{2}\d{4}$">
-                                    <input type="text" name="regex_hint" value="{{ $field->regex_hint }}" placeholder="{{ __('Hinweistext bei Fehleingabe') }}">
+                                    <input type="text" name="regex" value="{{ $field->regex }}" placeholder="^[A-Z]{2}\d{4}$" aria-label="{{ __('Regulärer Ausdruck (optional, ohne Delimiter)') }}">
+                                    <input type="text" name="regex_hint" value="{{ $field->regex_hint }}" placeholder="{{ __('Hinweistext bei Fehleingabe') }}" aria-label="{{ __('Hinweistext bei Fehleingabe') }}">
                                 @elseif($field->type === 'product')
-                                    <span class="hint">Produkte im Reiter „Produkte" pflegen</span>
+                                    <span class="hint">{{ __('Produkte im Menü „Produkte“ pflegen') }}</span>
                                 @else
                                     <span class="hint">–</span>
                                 @endif
                             </td>
-                            <td style="text-align:center"><input type="checkbox" name="required" value="1" @checked($field->required)></td>
-                            <td style="text-align:center"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" @checked($field->active)></td>
-                            <td style="white-space:nowrap">
+                            <td style="text-align:center" data-label="{{ __('Pflicht') }}"><input type="checkbox" name="required" value="1" @checked($field->required) aria-label="{{ __('Pflicht') }}"></td>
+                            <td style="text-align:center" data-label="{{ __('Aktiv') }}"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" @checked($field->active) aria-label="{{ __('Aktiv') }}"></td>
+                            <td class="actions" style="white-space:nowrap">
                                 <button class="primary small">{{ __('Speichern') }}</button>
                         </form>
-                        <form method="post" action="{{ route('admin.fields.destroy', $field) }}" class="inline-form" onsubmit="return confirm('Feld wirklich löschen?')">
+                        <form method="post" action="{{ route('admin.fields.destroy', $field) }}" class="inline-form" onsubmit="return confirm(@js(__('Feld „:name“ wirklich löschen?', ['name' => $field->label])))">
                             @csrf @method('DELETE')
                             <button class="primary small danger">{{ __('Löschen') }}</button>
                         </form>
                             </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="hint">Für diese Rolle sind noch keine Felder angelegt.</td></tr>
+                    <tr><td colspan="7" class="hint">{{ __('Für diese Rolle sind noch keine Felder angelegt.') }}</td></tr>
                 @endforelse
             </table>
         </div>
 
         <div class="panel">
-            <h2 style="margin-top:0">Neues Feld für „{{ $role->name }}“</h2>
+            <h2 style="margin-top:0">{{ __('Neues Feld für „:name“', ['name' => $role->displayName()]) }}</h2>
             <form method="post" action="{{ route('admin.fields.store') }}">
                 @csrf
                 <input type="hidden" name="role_id" value="{{ $role->id }}">
                 <div class="row">
-                    <div><label>{{ __('Bezeichnung') }}</label><input type="text" name="label" required></div>
-                <div><label>{{ __('Bezeichnung (EN, optional)') }}</label><input type="text" name="label_en" placeholder="Desk selection"></div>
+                    <div><label for="field-new-label">{{ __('Bezeichnung') }}</label><input type="text" id="field-new-label" name="label" required></div>
+                <div><label for="field-new-label-en">{{ __('Bezeichnung (EN, optional)') }}</label><input type="text" id="field-new-label-en" name="label_en" placeholder="Desk selection"></div>
                 <div>
-                    <label>{{ __('Prozesse') }}</label>
-                    <div class="proc-checks">
+                    <span class="group-label" id="field-new-processes">{{ __('Prozesse') }}</span>
+                    <div class="proc-checks" role="group" aria-labelledby="field-new-processes">
                         @foreach(\App\Models\Process::orderBy('sort_order')->get() as $proc)
                             <label class="choice"><input type="checkbox" name="processes[]" value="{{ $proc->key }}" @checked($proc->is_system)> {{ $proc->displayName() }}</label>
                         @endforeach
@@ -94,37 +94,37 @@
                 </div>
                 @if($role->is_intake)
                     <div>
-                        <label>{{ __('Ausfüllen bei') }}</label>
-                        <select name="fill_stage">
+                        <label for="field-new-stage">{{ __('Ausfüllen bei') }}</label>
+                        <select id="field-new-stage" name="fill_stage">
                             <option value="intake">{{ __('Anlage durch HR') }}</option>
                             <option value="preparation">{{ __('Vorbereitung durch den Vorgesetzten') }}</option>
                         </select>
                     </div>
-                    <div><label>&nbsp;</label><label class="choice"><input type="checkbox" name="visible_to_all" value="1"> {{ __('Für alle Abteilungen sichtbar') }}</label></div>
+                    <div><span class="group-label" aria-hidden="true">&nbsp;</span><label class="choice"><input type="checkbox" name="visible_to_all" value="1"> {{ __('Für alle Abteilungen sichtbar') }}</label></div>
                 @endif
                     <div style="max-width:180px">
-                        <label>{{ __('Typ') }}</label>
+                        <label for="new-type">{{ __('Typ') }}</label>
                         <select name="type" id="new-type">
                             @foreach(\App\Models\CustomField::TYPES as $key => $label)
                                 <option value="{{ $key }}">{{ __($label) }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div style="max-width:120px"><label>{{ __('Reihenfolge') }}</label><input type="number" name="sort_order" value="{{ ($fields->max('sort_order') ?? 0) + 1 }}" min="0"></div>
+                    <div style="max-width:120px"><label for="field-new-order">{{ __('Reihenfolge') }}</label><input type="number" id="field-new-order" name="sort_order" value="{{ ($fields->max('sort_order') ?? 0) + 1 }}" min="0"></div>
                 </div>
                 <div id="new-select">
-                    <label>{{ __('Optionen (eine pro Zeile)') }}</label>
-                    <textarea name="options_raw" rows="3" placeholder="Notebook&#10;Desktop&#10;Thin Client"></textarea>
+                    <label for="field-new-options">{{ __('Optionen (eine pro Zeile)') }}</label>
+                    <textarea id="field-new-options" name="options_raw" rows="3" placeholder="Notebook&#10;Desktop&#10;Thin Client"></textarea>
                 </div>
-                <p class="hint" id="new-product-hint" style="display:none">Die auswählbaren Produkte werden im Reiter „Produkte" gepflegt (inkl. Preis, Bild, Artikel- und Herstellernummer).</p>
+                <p class="hint" id="new-product-hint" style="display:none">{{ __('Die auswählbaren Produkte werden im Menü „Produkte“ gepflegt (inkl. Preis, Bild, Artikel- und Herstellernummer).') }}</p>
                 <div id="new-text" style="display:none">
-                    <label>{{ __('Regulärer Ausdruck (optional, ohne Delimiter)') }}</label>
-                    <input type="text" name="regex" placeholder="^\+49[0-9 ]{6,}$">
-                    <label>{{ __('Hinweistext bei Fehleingabe') }}</label>
-                    <input type="text" name="regex_hint" placeholder="Bitte Telefonnummer im Format +49 … eingeben">
+                    <label for="field-new-regex">{{ __('Regulärer Ausdruck (optional, ohne Delimiter)') }}</label>
+                    <input type="text" id="field-new-regex" name="regex" placeholder="^\+49[0-9 ]{6,}$">
+                    <label for="field-new-regex-hint">{{ __('Hinweistext bei Fehleingabe') }}</label>
+                    <input type="text" id="field-new-regex-hint" name="regex_hint" placeholder="{{ __('Bitte Telefonnummer im Format +49 … eingeben') }}">
                 </div>
-                <label><input type="checkbox" name="required" value="1"> Pflichtfeld</label>
-                <label><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" checked> Aktiv</label>
+                <label class="choice"><input type="checkbox" name="required" value="1"> {{ __('Pflichtfeld') }}</label>
+                <label class="choice"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" checked> {{ __('Aktiv') }}</label>
                 <button class="primary">{{ __('Feld anlegen') }}</button>
             </form>
         </div>

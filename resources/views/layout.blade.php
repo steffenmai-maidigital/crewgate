@@ -101,10 +101,18 @@
     @yield('content')
 </main>
 @include('partials.footer', ['signedIn' => (bool) $u])
-@if(\App\Support\Fox::visible())
-    @include('partials.fox', ['foxPrefix' => 'cg-fox'])
-@endif
 <script>
+    // Reste des entfernten Fuchs-Helfers (cg-fox-*, cg-fuchs-*) einmal aus dem Browser räumen
+    // Clear leftovers of the removed fox helper (cg-fox-*, cg-fuchs-*) from the browser once
+    ['localStorage', 'sessionStorage'].forEach(function (name) {
+        try {
+            var store = window[name];
+            for (var i = store.length - 1; i >= 0; i--) {
+                var key = store.key(i);
+                if (key && /^cg-(fox|fuchs)-/.test(key)) store.removeItem(key);
+            }
+        } catch (e) { /* Speicher gesperrt / storage blocked */ }
+    });
     document.getElementById('theme-toggle').addEventListener('click', function () {
         const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
         document.documentElement.dataset.theme = next;

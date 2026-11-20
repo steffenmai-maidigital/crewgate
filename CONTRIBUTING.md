@@ -77,7 +77,7 @@ die Handbücher unter `docs/` und die deutsche Hälfte der Kommentare.
   (Prozessart) = onboarding, Stellenwechsel = job change, Austritt = exit,
   Stammdatenänderung = master data change, Anlage = intake, Vorgesetzter =
   supervisor, Abteilung = department, quittieren = acknowledge, Protokoll =
-  audit log, Sicherung = backup, Verzeichnis = directory, Fuchs-Helfer = fox.
+  audit log, Sicherung = backup, Verzeichnis = directory.
 - Die Einträge im Protokoll (`activity_logs`) bilden eine Hash-Kette und
   behalten ihre gespeicherten (deutschen) Typen; die Konstanten heißen
   englisch (`ActivityLog::TYPE_CASE = 'vorgang'` …).
@@ -100,7 +100,7 @@ German half of the comments.
   (process type) = onboarding, Stellenwechsel = job change, Austritt = exit,
   Stammdatenänderung = master data change, Anlage = intake, Vorgesetzter =
   supervisor, Abteilung = department, quittieren = acknowledge, Protokoll =
-  audit log, Sicherung = backup, Verzeichnis = directory, Fuchs-Helfer = fox.
+  audit log, Sicherung = backup, Verzeichnis = directory.
 - Audit log entries (`activity_logs`) form a hash chain and keep their stored
   (German) types; the constants have English names
   (`ActivityLog::TYPE_CASE = 'vorgang'` …).
